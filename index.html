@@ -1,0 +1,1508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concord · Rater calibration</title>
+<meta name="description" content="Concord: rater calibration and data quality console. Independent prototype using synthetic demo data.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='12' cy='16' r='8' fill='none' stroke='%232a5bd7' stroke-width='3'/%3E%3Ccircle cx='20' cy='16' r='8' fill='none' stroke='%231c1d1f' stroke-width='3'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #fbfaf7;
+  --ink: #1b1c1e;
+  --ink-2: #4f5157;
+  --muted: #7d7f85;
+  --line: #e3e1db;
+  --line-2: #efede8;
+  --accent: #2a5bd7;
+  --accent-soft: #e9effc;
+  --series-r6: #d0612a;
+  --series-other: #bdbbb4;
+  --good: #1d7a4c;
+  --good-soft: #e7f3ec;
+  --warn: #9a6200;
+  --warn-soft: #fbf1dc;
+  --bad: #b8332a;
+  --bad-soft: #fbeae8;
+  --band-good: #edf6f0;
+  --band-warn: #fcf5e6;
+  --band-bad: #fbefed;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(20,20,20,.04), 0 1px 1px rgba(20,20,20,.03);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+button { font: inherit; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.banner { background: #1f2024; color: #e9e8e4; font-size: 12.5px; text-align: center; padding: 5px 16px; letter-spacing: .01em; }
+header.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+.top-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px 0 14px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+.brand .sub { color: var(--ink-2); font-size: 14px; }
+.meta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); }
+.meta b { color: var(--ink); font-weight: 600; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--line-2); color: var(--ink-2); border: 1px solid var(--line); }
+nav.tabs { display: flex; gap: 4px; overflow-x: auto; }
+nav.tabs button {
+  border: 0; background: none; padding: 10px 14px 11px; color: var(--ink-2); cursor: pointer; font-weight: 500; white-space: nowrap;
+  border-bottom: 2px solid transparent; border-radius: 0;
+}
+nav.tabs button:hover { color: var(--ink); }
+nav.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+nav.tabs .num { display: inline-block; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; line-height: 18px; text-align: center; background: var(--line-2); color: var(--ink-2); margin-right: 6px; }
+nav.tabs button[aria-selected="true"] .num { background: var(--accent); color: #fff; }
+main { padding: 26px 0 40px; }
+.view { display: none; }
+.view.active { display: block; }
+h2 { font-size: 20px; margin: 0 0 4px; letter-spacing: -.01em; }
+h3 { font-size: 16px; margin: 0 0 4px; }
+h4 { font-size: 14px; margin: 0 0 6px; }
+.lede { color: var(--ink-2); margin: 0 0 20px; max-width: 820px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow); min-width: 0; }
+.grid { display: grid; gap: 18px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.g4 { grid-template-columns: repeat(4, 1fr); }
+.g-5-7 { grid-template-columns: 5fr 7fr; }
+.stack > * + * { margin-top: 18px; }
+.section-title { margin: 30px 0 12px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.chart-title { font-weight: 600; font-size: 14.5px; margin: 0; }
+.takeaway { margin: 2px 0 12px; font-size: 14px; color: var(--ink); }
+.takeaway::before { content: "→ "; color: var(--accent); font-weight: 600; }
+.note { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+svg text { font-family: inherit; }
+.axis text { fill: var(--muted); font-size: 11px; }
+.axis line, .axis path { stroke: var(--line); }
+.axis-label { fill: var(--ink-2); font-size: 11.5px; }
+.grid-line { stroke: var(--line-2); }
+
+/* legends */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+.legend .lg { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; border: 1px solid var(--line); }
+.legend i.ln { width: 18px; height: 0; border: 0; border-top: 2.5px solid; border-radius: 0; }
+
+/* status */
+.status { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; padding: 2px 9px 2px 7px; border-radius: 999px; white-space: nowrap; }
+.status svg { width: 13px; height: 13px; }
+.status.good { color: var(--good); background: var(--good-soft); }
+.status.warn { color: var(--warn); background: var(--warn-soft); }
+.status.bad { color: var(--bad); background: var(--bad-soft); }
+.status.neutral { color: var(--ink-2); background: var(--line-2); }
+
+/* verdict */
+.verdict { display: flex; gap: 16px; align-items: flex-start; border-left: 4px solid var(--bad); }
+.verdict.ok { border-left-color: var(--good); }
+.verdict .icon { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--bad-soft); color: var(--bad); display: grid; place-items: center; }
+.verdict.ok .icon { background: var(--good-soft); color: var(--good); }
+.verdict h2 { font-size: 21px; }
+.verdict p { margin: 6px 0 0; color: var(--ink-2); max-width: 900px; }
+.kpis { display: flex; gap: 28px; margin-top: 14px; flex-wrap: wrap; }
+.kpi .v { font-size: 22px; font-weight: 650; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.kpi .l { font-size: 12px; color: var(--muted); }
+
+/* issue cards */
+.issue { display: flex; flex-direction: column; gap: 8px; border-top: 3px solid var(--warn); }
+.issue.bad { border-top-color: var(--bad); }
+.issue .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.issue .who { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.issue h3 { font-size: 16.5px; }
+.issue .evidence { margin: 0; font-size: 14px; }
+.rule { font-size: 12.5px; color: var(--ink-2); background: var(--surface-2); border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; }
+.rule b { color: var(--ink); }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-weight: 600; font-size: 14px; text-align: left; margin-top: auto; }
+.link-btn:hover { text-decoration: underline; }
+
+/* tables */
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--line); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: var(--surface-2); }
+tr.selected td { background: var(--accent-soft) !important; }
+tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.flagged-val { color: var(--bad); font-weight: 600; }
+.table-scroll { overflow-x: auto; }
+
+/* chips / segmented */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; padding: 6px 12px; cursor: pointer; color: var(--ink-2); font-size: 13px; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+.dimtiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.dimtile { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; }
+.dimtile:hover { border-color: #c9c6be; }
+.dimtile[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.dimtile .name { font-size: 13px; color: var(--ink-2); }
+.dimtile .val { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; margin: 2px 0 4px; }
+
+/* examples */
+details.ex { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+details.ex + details.ex { margin-top: 8px; }
+details.ex summary { list-style: none; cursor: pointer; padding: 10px 14px; display: grid; grid-template-columns: 128px 1fr auto; gap: 12px; align-items: center; }
+details.ex summary::-webkit-details-marker { display: none; }
+details.ex summary .caret { transition: transform .15s; color: var(--muted); }
+details.ex[open] summary .caret { transform: rotate(90deg); }
+details.ex summary .id { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+details.ex summary .p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+details.ex .body { padding: 4px 14px 14px; border-top: 1px solid var(--line-2); }
+.qa { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+.qa .lbl { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }
+.qa .txt { white-space: pre-wrap; font-size: 13.5px; background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 6px; padding: 10px 12px; }
+.scores { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.score { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-width: 104px; }
+.score .r { font-size: 12px; font-weight: 600; }
+.score .s { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.score .c { font-size: 11px; color: var(--muted); }
+.score.pro { border-color: #b9c9f1; background: #f3f6fd; }
+.score.user { border-color: #e6c3a9; background: #fcf5ef; }
+.campkey { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; }
+.campkey.pro { background: #b9c9f1; border: 1px solid #8ea6e3; }
+.campkey.user { background: #f0d4bf; border: 1px solid #d9a983; }
+
+/* guideline */
+.guides { display: grid; grid-template-columns: 1fr 1.6fr; gap: 18px; }
+.guide { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; background: var(--surface); }
+.guide.orig { background: var(--surface-2); }
+.guide .tag { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.guide.rev .tag { color: var(--accent); }
+.guide blockquote { margin: 10px 0 0; font-size: 15px; }
+.guide dl { margin: 10px 0 0; display: grid; grid-template-columns: 34px 1fr; gap: 6px 10px; font-size: 14px; }
+.guide dt { font-weight: 700; font-variant-numeric: tabular-nums; background: var(--accent-soft); color: var(--accent); border-radius: 6px; text-align: center; height: 24px; line-height: 24px; }
+.guide dd { margin: 0; }
+.guide .worked { margin-top: 12px; font-size: 13.5px; border-top: 1px solid var(--line-2); padding-top: 10px; }
+.guide .worked p { margin: 6px 0; }
+
+/* memo */
+.memo-actions { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--ink); display: inline-flex; gap: 8px; align-items: center; }
+.btn:hover { border-color: #c9c6be; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.memo { max-width: 820px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 40px 48px; box-shadow: 0 2px 10px rgba(0,0,0,.04); font-size: 14.5px; }
+.memo .mhead { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 16px; display: grid; grid-template-columns: 70px 1fr; gap: 2px 10px; font-size: 13.5px; }
+.memo .mhead .k { color: var(--muted); }
+.memo h2 { font-size: 19px; margin-bottom: 12px; }
+.memo h3 { font-size: 14.5px; margin: 16px 0 4px; }
+.memo p { margin: 4px 0; }
+.memo ol, .memo ul { margin: 4px 0; padding-left: 20px; }
+.memo li { margin: 3px 0; }
+.memo table { font-size: 13px; margin-top: 6px; }
+.memo td, .memo th { padding: 4px 8px; }
+.memo th { text-transform: none; letter-spacing: 0; font-size: 12px; }
+.memo .ask { background: var(--accent-soft); border-radius: 6px; padding: 10px 14px; margin-top: 6px; }
+.memo .foot { margin-top: 18px; font-size: 12px; color: var(--muted); }
+.toast { font-size: 13px; color: var(--good); }
+
+/* method */
+.prose { max-width: 820px; }
+.prose p, .prose li { color: var(--ink); }
+.prose h3 { margin-top: 22px; }
+.prose ul { padding-left: 20px; }
+.prose code { font-size: 13px; background: var(--line-2); padding: 1px 5px; border-radius: 4px; }
+.prose table { margin: 8px 0; }
+.wc { font-size: 12px; color: var(--muted); }
+
+/* tooltip */
+#tip { position: fixed; z-index: 50; pointer-events: none; background: #1f2024; color: #f2f1ee; font-size: 12.5px; padding: 7px 10px; border-radius: 6px; max-width: 280px; opacity: 0; transition: opacity .08s; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+#tip.on { opacity: 1; }
+#tip b { color: #fff; }
+.hit { cursor: default; }
+
+footer { border-top: 1px solid var(--line); padding: 18px 0 26px; font-size: 13px; color: var(--ink-2); }
+footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+@media (max-width: 960px) {
+  .g2, .g3, .g4, .g-5-7, .guides, .qa { grid-template-columns: 1fr; }
+  .dimtiles { grid-template-columns: repeat(2, 1fr); }
+  .memo { padding: 24px 20px; }
+}
+@media (max-width: 560px) {
+  .wrap { padding: 0 16px; }
+  details.ex summary { grid-template-columns: 1fr auto; }
+  details.ex summary .id { display: none; }
+}
+
+@media print {
+  @page { size: auto; margin: 11mm 13mm; }
+  body { background: #fff; font-size: 10.5pt; }
+  .banner, header.top, footer, .view:not(#view-summary), .memo-actions, .no-print, #tip { display: none !important; }
+  main { padding: 0; }
+  .wrap { max-width: none; padding: 0; }
+  #view-summary { display: block !important; }
+  .memo { border: 0; box-shadow: none; padding: 0; max-width: none; font-size: 9.2pt; line-height: 1.34; }
+  .memo h2 { font-size: 13.5pt; margin-bottom: 6px; }
+  .memo h3 { font-size: 10.2pt; margin: 7px 0 1px; }
+  .memo .foot { margin-top: 8px; }
+  .memo td, .memo th { padding: 2px 8px; }
+  .memo .mhead { font-size: 9pt; padding-bottom: 6px; margin-bottom: 8px; }
+  .memo table { font-size: 8.8pt; }
+  .memo .ask { background: #f1f4fb; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+<div class="banner">Prototype · synthetic data · built to show a calibration workflow</div>
+<header class="top">
+  <div class="wrap">
+    <div class="top-inner">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><circle cx="12" cy="16" r="8" fill="none" stroke="#2a5bd7" stroke-width="2.6"/><circle cx="20" cy="16" r="8" fill="none" stroke="#1b1c1e" stroke-width="2.6"/></svg>
+        <div><h1>Concord</h1><div class="sub">Rater calibration &amp; data quality console</div></div>
+      </div>
+      <div class="meta" id="meta"></div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views" id="tabs"></nav>
+  </div>
+</header>
+<main class="wrap">
+  <section class="view" id="view-overview" role="tabpanel"></section>
+  <section class="view" id="view-raters" role="tabpanel"></section>
+  <section class="view" id="view-rubric" role="tabpanel"></section>
+  <section class="view" id="view-summary" role="tabpanel"></section>
+  <section class="view" id="view-method" role="tabpanel"></section>
+</main>
+<footer><div class="wrap"><span>Prototype by Beatriz Ferreira · <a href="https://github.com/bea-ferreira" rel="noopener">GitHub</a></span><span>All customer names, items and ratings are synthetic demo data (seed 42).</span></div></footer>
+<div id="tip" role="tooltip"></div>
+<script id="engine">
+/* ===================================================================
+   Concord engine: synthetic data generator + metrics + flag rules.
+   Pure functions, no DOM. Synthetic demo data, seed 42.
+   =================================================================== */
+var Engine = (function () {
+  'use strict';
+
+  var SEED = 42;
+  var N_ITEMS = 240;
+  var DRIFT_START = 131;           // R4 turns lenient from this sequence index
+  var DRIFT_SHIFT = 0.9;
+  var NOISE_SD = 0.4;
+  var RATERS = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6'];
+  var DIMS = ['correctness', 'instruction_following', 'helpfulness', 'tone'];
+  var DIM_LABEL = {
+    correctness: 'Correctness',
+    instruction_following: 'Instruction following',
+    helpfulness: 'Helpfulness',
+    tone: 'Tone'
+  };
+  var DIM_DEF = {
+    correctness: 'Factually and technically accurate.',
+    instruction_following: 'Does what the prompt asked.',
+    helpfulness: 'Useful to the user.',
+    tone: 'Tone is appropriate for the context.'
+  };
+  var CATS = ['coding', 'factual Q&A', 'advice', 'creative writing', 'summarization'];
+  var BIAS = { R1: 0.15, R2: -0.2, R3: 0.05, R4: 0.1, R5: -0.1, R6: 0 };
+  // How each rater reads the ambiguous tone guideline.
+  var CAMP = { R1: 'pro', R3: 'pro', R2: 'user', R5: 'user', R4: 'none', R6: 'none' };
+  var CAMP_LABEL = { pro: 'Professional-setting camp', user: "User's-context camp", none: 'No consistent reading' };
+  var TIME_MEDIAN = { R1: 52, R2: 47, R3: 58, R4: 50, R5: 44, R6: 9 };
+
+  var THRESH = { reliable: 0.8, tentative: 0.667 };
+  var RULES = {
+    windowSize: 30,
+    agreeTolerance: 0.5,       // a rating "agrees" if within ±0.5 of the leave-one-out mean
+    driftDrop: 0.2,
+    driftRun: 30,
+    rushTimeRatio: 0.4,
+    rushGoldAcc: 0.7,
+    ambiguousAlpha: 0.667,
+    ambiguousOthers: 0.75
+  };
+
+  /* ---------- PRNG ---------- */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function makeGauss(rng) {
+    var spare = null;
+    return function () {
+      if (spare !== null) { var s = spare; spare = null; return s; }
+      var u = 0, v = 0;
+      while (u === 0) u = rng();
+      v = rng();
+      var r = Math.sqrt(-2 * Math.log(u));
+      spare = r * Math.sin(2 * Math.PI * v);
+      return r * Math.cos(2 * Math.PI * v);
+    };
+  }
+  function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+  function toScale(x) { return clamp(Math.round(x), 1, 5); }
+
+  /* ---------- Hand-written items ---------- */
+  // t: latent true scores [correctness, instruction_following, helpfulness, tone]
+  // toneUser / tonePro: how each tone camp perceives the response (only for ambiguous items)
+  var WRITTEN = [
+    { seq: 3, category: 'coding', t: [5, 5, 5, 4],
+      prompt: 'Write a Python function that returns the n-th Fibonacci number.',
+      response: 'def fib(n):\n    """Return the n-th Fibonacci number (fib(0) = 0, fib(1) = 1)."""\n    if n < 0:\n        raise ValueError("n must be non-negative")\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n\nThis runs in O(n) time and O(1) memory, so it handles large n without hitting the recursion limit.' },
+    { seq: 9, category: 'factual Q&A', t: [5, 5, 5, 4],
+      prompt: 'What causes the seasons on Earth?',
+      response: "Seasons are caused by the tilt of Earth's axis, about 23.4° relative to its orbit. For part of the year one hemisphere leans toward the Sun and gets more direct sunlight and longer days (summer), while the other leans away (winter). It is not about distance: Earth is actually closest to the Sun in early January, during the Northern Hemisphere's winter." },
+    { seq: 14, category: 'advice', t: [4, 5, 5, null], toneUser: 5, tonePro: 1.6, ambiguous: true,
+      prompt: "ok real talk. I've been working 60 hr weeks for 3 months and I'm fried. how do I tell my manager I need to pull back without it sounding like I'm about to quit?? 😩",
+      response: "Oof, 60-hour weeks for three months? Your brain deserves a medal and a nap. 😅 Here's a way to say it that's honest without sounding like you've got one foot out the door:\n\n1. Ask for a 1:1 and lead with commitment: \"I want to keep doing great work here, and the current pace isn't sustainable for me.\"\n2. Bring receipts: what you've shipped, and what's slipped because of the load.\n3. Come with a proposal, like moving one deadline or getting help with on-call.\n\nManagers hear \"here's a plan\" very differently from \"I'm drowning.\" You've got this. 💪" },
+    { seq: 29, category: 'creative writing', t: [5, 5, 5, null], toneUser: 5, tonePro: 1.6, ambiguous: true,
+      prompt: "Write a short toast for my brother's wedding. He's a huge goofball and everyone will expect me to roast him a little.",
+      response: "For those who don't know me, I'm Danny's sister, which means I've had a front-row seat to 29 years of questionable decisions. The mullet. The \"business\" selling glow sticks. The time he tried to deep-fry a frozen turkey in the garage.\n\nSo when he told me he'd met someone smart, kind and patient, I assumed she was imaginary. Maya, you are very real, and you are the best decision he has ever made.\n\nTo Danny and Maya: may your love be stronger than his cooking is dangerous!" },
+    { seq: 40, category: 'summarization', t: [4, 2, 3, 4],
+      prompt: "Summarize this in one sentence: \"Starting March 3, the Denver office will move from the 4th floor to the 11th floor of the same building. Desks will be packed by facilities on Friday, February 28. Employees should take personal items home before then. Badge access to the 11th floor will be activated automatically. The 4th-floor kitchen will close on February 26.\"",
+      response: "The Denver office is moving from the 4th to the 11th floor of the same building on March 3. Facilities will pack desks on February 28, so employees should take personal items home before then. Badge access will update automatically, and the 4th-floor kitchen closes on February 26." },
+    { seq: 47, category: 'advice', t: [5, 4, 4, null], toneUser: 1.6, tonePro: 5, ambiguous: true,
+      prompt: "I just found out my whole team is being laid off on Friday. I have a mortgage and two kids. What should I do first? I can't think straight.",
+      response: "Upon notification of a reduction in force, employees should take the following actions:\n\n1. Request written documentation of severance terms, benefits continuation (COBRA) eligibility and final pay dates.\n2. Review any non-compete or confidentiality agreements before signing release documents.\n3. File for unemployment insurance in your state of residence at the earliest eligible date.\n4. Update your résumé and professional profiles.\n\nFailure to complete these steps promptly may result in a loss of benefits." },
+    { seq: 58, category: 'coding', t: [2, 3, 2, 4],
+      prompt: 'In JavaScript, how do I remove duplicates from an array of objects by their id field?',
+      response: 'You can use a Set, which only stores unique values:\n\nconst unique = [...new Set(items)];\n\nThis removes all duplicates in a single line.' },
+    { seq: 66, category: 'creative writing', t: [5, 5, 4, 5],
+      prompt: 'Write a haiku about autumn rain.',
+      response: 'Cold rain on the eaves,\nmaple leaves let go at once,\nthe gutter runs red.' },
+    { seq: 76, category: 'advice', t: [4, 5, 4, null], toneUser: 5, tonePro: 1.6, ambiguous: true,
+      prompt: "my best friend keeps canceling plans last minute and honestly it's starting to really hurt. how do I bring it up without making it a whole thing",
+      response: "Ugh, the last-minute cancel is the worst, especially from your person. 😕 Keep it low-key and about you, not a list of their crimes:\n\n\"Hey, I miss hanging out. When plans fall through last minute I end up kinda bummed. Is everything okay on your end?\"\n\nAsking if they're okay gives them room to tell you if something's going on, and it keeps the chat from turning into a trial." },
+    { seq: 88, category: 'factual Q&A', t: [1, 4, 2, 4],
+      prompt: 'How many bones are in the adult human body?',
+      response: 'An adult human has 212 bones. Babies are born with more, around 300, and some fuse together as we grow.' },
+    { seq: 103, category: 'advice', t: [5, 4, 4, null], toneUser: 1.6, tonePro: 5, ambiguous: true,
+      prompt: "My cofounder hasn't answered my messages in 9 days and just pushed code that deletes half our features. Honestly I'm furious. What do I even do?",
+      response: "Recommended course of action:\n\n(a) Restrict repository write access pending clarification.\n(b) Restore the prior release from version control and document the change history.\n(c) Send written notice requesting a meeting within five business days.\n(d) Consult legal counsel regarding the shareholders' agreement, specifically vesting and removal provisions.\n\nMaintain a factual, non-emotional record of all communications." },
+    { seq: 112, category: 'coding', t: [5, 5, 4, 4],
+      prompt: 'What does this regex match? ^\\d{3}-\\d{4}$',
+      response: 'It matches a string that is exactly three digits, a hyphen, then four digits, and nothing else, for example "555-1234". The ^ and $ anchor the match to the start and end, so "a555-1234" or "555-12345" will not match.' },
+    { seq: 121, category: 'creative writing', t: [5, 5, 5, null], toneUser: 5, tonePro: 1.6, ambiguous: true,
+      prompt: 'Write a limerick making fun of my roommate for missing his flight to Vegas because he was napping.',
+      response: 'There once was a napper named Lou,\nWho had only one thing he must do.\nBut he dozed in his chair\nWhile his plane took the air,\nAnd Vegas went on without Lou.' },
+    { seq: 130, category: 'summarization', t: [5, 5, 4, 4],
+      prompt: 'Turn these meeting notes into 3 bullet points: "Q3 launch moved to Oct 14 because the payments vendor needs two more weeks. Marketing will push the email campaign to match. Priya owns the updated timeline, due Friday. We agreed not to announce the date publicly until the vendor confirms in writing."',
+      response: '• Q3 launch moves to October 14 because the payments vendor needs two more weeks.\n• Marketing will shift the email campaign to match; Priya will share the updated timeline by Friday.\n• The new date stays internal until the vendor confirms in writing.' },
+    { seq: 139, category: 'coding', t: [5, 5, 4, 4],
+      prompt: 'Write a SQL query to get the top 3 customers by total order value in 2024 from orders(customer_id, amount, created_at).',
+      response: "SELECT customer_id, SUM(amount) AS total_value\nFROM orders\nWHERE created_at >= '2024-01-01'\n  AND created_at <  '2025-01-01'\nGROUP BY customer_id\nORDER BY total_value DESC\nLIMIT 3;\n\nUsing a half-open date range keeps orders from late on December 31 and avoids casting created_at." },
+    { seq: 158, category: 'advice', t: [4, 5, 5, null], toneUser: 5, tonePro: 1.6, ambiguous: true,
+      prompt: "Interview tomorrow for my dream job and I'm spiraling. Any last-minute tips?? Please be honest, I'm so nervous lol",
+      response: "Okay, deep breath. Spiraling the night before means you care, not that you're unprepared. 🙂 Three things for tonight:\n\n• Pick your two best stories (a win, and a time you recovered from a mistake) and say them out loud once.\n• Write down three questions you actually want answered about the role.\n• Then stop prepping and sleep.\n\nTomorrow it's completely fine to say \"let me think about that for a second.\" Interviewers like that more than a rushed answer. Go get it! 🚀" },
+    { seq: 167, category: 'factual Q&A', t: [5, 5, 5, 4],
+      prompt: 'Who was the first person to reach the South Pole?',
+      response: "Roald Amundsen's Norwegian expedition reached the South Pole on 14 December 1911, about five weeks ahead of Robert Falcon Scott's British team." },
+    { seq: 182, category: 'creative writing', t: [5, 5, 5, null], toneUser: 5, tonePro: 1.6, ambiguous: true,
+      prompt: "Write me a dramatic, over-the-top resignation letter from my job at a coffee shop. It's a joke for my friends' group chat, not for my actual boss.",
+      response: "To the Management of The Daily Grind,\n\nIt is with a heavy heart and a sticky apron that I tender my resignation. For two years I have steamed your milk, endured your \"quick question\" at 5:58 a.m., and witnessed things at the oat-milk station that no barista should ever see.\n\nI leave behind my name tag, my dignity, and the espresso machine, the only one here who truly understood me. Do not try to find me. I will be living my best life somewhere no one says \"extra hot\" ever again.\n\nFoam-ly yours,\nThe Barista Formerly Known as Employee of the Month (March only)" },
+    { seq: 199, category: 'summarization', t: [2, 4, 3, 4],
+      prompt: 'Summarize this excerpt in two sentences: "The city council voted 6–3 on Tuesday to extend the downtown bike lane pilot for another year. Supporters cited fewer near-miss reports at the four pilot intersections; opponents said delivery drivers have lost loading space. Staff will return in six months with options for dedicated loading zones."',
+      response: 'The city council voted 6–3 to extend the downtown bike lane pilot by a year, after crashes at the pilot intersections fell 40%. Staff will report back in six months on adding dedicated loading zones for delivery drivers.' },
+    { seq: 214, category: 'creative writing', t: [4, 5, 5, null], toneUser: 5, tonePro: 1.6, ambiguous: true,
+      prompt: "Write a short pre-game speech for my high-school soccer team before the final. They're nervous. Keep it real, like how a coach actually talks.",
+      response: "Alright, listen up. Look around this room. Every one of you ran the hills in August, showed up in the rain, and threw up at least once at practice. Don't pretend you didn't, Marcus.\n\nNobody out there has worked harder than you. So stop thinking about the scoreboard. Win your first tackle. Win your next pass. Talk to each other. If you're tired, good. That means you're doing it right.\n\nLeave nothing on that field. Hands in!" },
+    { seq: 230, category: 'advice', t: [4, 5, 4, 4],
+      prompt: "What's a reasonable way to start an emergency fund on a tight budget?",
+      response: "Start smaller than you think: aim for a first $500–$1,000, which covers most surprise car or medical bills. Set up an automatic transfer of even $10–$25 per paycheck into a separate savings account so it's out of sight. Put windfalls like tax refunds straight in. Once you hit the first target, build toward three months of essential expenses." }
+  ];
+
+  /* ---------- Generator ---------- */
+  function generate() {
+    var rng = mulberry32(SEED);
+    var gauss = makeGauss(rng);
+    var i, d, r;
+
+    // Categories: 48 of each, shuffled.
+    var cats = [];
+    for (i = 0; i < N_ITEMS; i++) cats.push(CATS[i % CATS.length]);
+    for (i = cats.length - 1; i > 0; i--) { var j = Math.floor(rng() * (i + 1)); var tmp = cats[i]; cats[i] = cats[j]; cats[j] = tmp; }
+    var writtenBySeq = {};
+    WRITTEN.forEach(function (w) { writtenBySeq[w.seq] = w; });
+    // Place hand-written items at their sequence index by swapping categories with a non-written slot.
+    WRITTEN.forEach(function (w) {
+      var idx = w.seq - 1;
+      if (cats[idx] === w.category) return;
+      for (var k = 0; k < N_ITEMS; k++) {
+        if (cats[k] === w.category && !writtenBySeq[k + 1]) { cats[k] = cats[idx]; cats[idx] = w.category; return; }
+      }
+    });
+
+    // Gold: 6 per category, never a hand-written item.
+    var isGold = new Array(N_ITEMS).fill(false);
+    CATS.forEach(function (c) {
+      var pool = [];
+      for (var k = 0; k < N_ITEMS; k++) if (cats[k] === c && !writtenBySeq[k + 1]) pool.push(k);
+      for (var g = 0; g < 6; g++) { var p = Math.floor(rng() * pool.length); isGold[pool[p]] = true; pool.splice(p, 1); }
+    });
+
+    var items = [];
+    for (i = 0; i < N_ITEMS; i++) {
+      var seq = i + 1, w = writtenBySeq[seq], cat = cats[i];
+      var t = [], toneUser, tonePro;
+      if (w) {
+        t = w.t.slice();
+        if (w.ambiguous) { toneUser = w.toneUser; tonePro = w.tonePro; t[3] = (toneUser + tonePro) / 2; }
+        else { toneUser = tonePro = t[3]; }
+      } else if (isGold[i]) {
+        // Gold items are chosen to be clear-cut: clearly bad or clearly good.
+        var q = rng() < 0.5 ? 1.0 + 0.5 * rng() : 4.5 + 0.5 * rng();
+        for (d = 0; d < 4; d++) t.push(clamp(q + 0.2 * gauss(), 1, 5));
+        toneUser = tonePro = t[3];
+      } else {
+        var base = 3 + 2.0 * gauss();
+        for (d = 0; d < 4; d++) t.push(clamp(base + 0.2 * gauss(), 1, 5));
+        if (cat === 'advice' || cat === 'creative writing') {
+          var split = (rng() < 0.5 ? -1 : 1) * (1.0 + 0.6 * rng());
+          toneUser = clamp(t[3] + split, 1, 5); tonePro = clamp(t[3] - split, 1, 5);
+        } else { toneUser = tonePro = t[3]; }
+      }
+      var item = {
+        item_id: 'NW-B3-' + String(seq).padStart(4, '0'),
+        sequence_index: seq,
+        category: cat,
+        is_gold: isGold[i],
+        written: !!w,
+        ambiguous_written: !!(w && w.ambiguous),
+        prompt: w ? w.prompt : 'Prompt #' + seq + ' (' + cat + ')',
+        response: w ? w.response : 'Model response #' + seq + ' (' + cat + '). Full text is not included for this synthetic item.',
+        true_score: t,
+        tone_user: toneUser,
+        tone_pro: tonePro
+      };
+      if (isGold[i]) item.gold_score = t.map(toScale);
+      items.push(item);
+    }
+
+    // Pre-draw all noise so alternate scenarios reuse identical noise.
+    var noise = {}, timeNoise = {};
+    RATERS.forEach(function (rid) {
+      noise[rid] = []; timeNoise[rid] = [];
+      for (i = 0; i < N_ITEMS; i++) {
+        noise[rid].push([gauss(), gauss(), gauss(), gauss()]);
+        timeNoise[rid].push(gauss());
+      }
+    });
+
+    function score(rid, it, i, d, mergedTone) {
+      var t = it.true_score[d];
+      if (d === 3) {
+        if (mergedTone) t = it.tone_user;               // revised guideline: the user's situation counts
+        else if (CAMP[rid] === 'pro') t = it.tone_pro;
+        else if (CAMP[rid] === 'user') t = it.tone_user;
+      }
+      var e = noise[rid][i][d];
+      if (rid === 'R6') return toScale(0.3 * t + 0.7 * (3.5 + 0.6 * e));   // ~70% noise
+      var x = t + BIAS[rid] + NOISE_SD * e;
+      if (rid === 'R4' && it.sequence_index >= DRIFT_START) x += DRIFT_SHIFT;
+      return toScale(x);
+    }
+
+    var ratings = {}, toneProjected = {}, seconds = {};
+    RATERS.forEach(function (rid) {
+      ratings[rid] = []; toneProjected[rid] = []; seconds[rid] = [];
+      for (i = 0; i < N_ITEMS; i++) {
+        var row = [];
+        for (d = 0; d < 4; d++) row.push(score(rid, items[i], i, d, false));
+        ratings[rid].push(row);
+        toneProjected[rid].push(score(rid, items[i], i, 3, true));
+        var sigma = rid === 'R6' ? 0.3 : 0.28;
+        seconds[rid].push(Math.round(TIME_MEDIAN[rid] * Math.exp(sigma * timeNoise[rid][i])));
+      }
+    });
+
+    return { items: items, ratings: ratings, toneProjected: toneProjected, seconds: seconds };
+  }
+
+  /* ---------- Statistics helpers ---------- */
+  function mean(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return a.length ? s / a.length : NaN; }
+  function median(a) { var b = a.slice().sort(function (x, y) { return x - y; }); var m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; }
+  function sd(a) { var m = mean(a), s = 0; for (var i = 0; i < a.length; i++) s += (a[i] - m) * (a[i] - m); return Math.sqrt(s / a.length); }
+  function pearson(x, y) {
+    var mx = mean(x), my = mean(y), sxy = 0, sxx = 0, syy = 0;
+    for (var i = 0; i < x.length; i++) { var a = x[i] - mx, b = y[i] - my; sxy += a * b; sxx += a * a; syy += b * b; }
+    return sxy / Math.sqrt(sxx * syy);
+  }
+
+  /* Krippendorff's alpha, interval metric (delta = (a-b)^2), with missing data.
+     units: array of arrays of values (null/undefined = missing).
+     Uses the identity  sum_{i!=j} (v_i - v_j)^2 = 2 (m * sum v^2 - (sum v)^2).            */
+  function krippendorffInterval(units) {
+    var n = 0, S = 0, SS = 0, Do = 0;
+    for (var u = 0; u < units.length; u++) {
+      var m = 0, s = 0, ss = 0;
+      for (var k = 0; k < units[u].length; k++) { var v = units[u][k]; if (v === null || v === undefined) continue; m++; s += v; ss += v * v; }
+      if (m < 2) continue;
+      n += m; S += s; SS += ss;
+      Do += 2 * (m * ss - s * s) / (m - 1);
+    }
+    if (n < 2) return NaN;
+    Do /= n;
+    var De = 2 * (n * SS - S * S) / (n * (n - 1));
+    return De === 0 ? 1 : 1 - Do / De;
+  }
+
+  /* Reference implementation with an arbitrary distance function (pairwise, slow). Used by selfTest. */
+  function krippendorffGeneric(units, delta) {
+    var pairable = [], Do = 0;
+    units.forEach(function (unit) {
+      var vals = unit.filter(function (v) { return v !== null && v !== undefined; });
+      if (vals.length < 2) return;
+      for (var i = 0; i < vals.length; i++) for (var j = 0; j < vals.length; j++) if (i !== j) Do += delta(vals[i], vals[j]) / (vals.length - 1);
+      pairable = pairable.concat(vals);
+    });
+    var n = pairable.length, De = 0;
+    for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) if (i !== j) De += delta(pairable[i], pairable[j]);
+    return 1 - (Do / n) / (De / (n * (n - 1)));
+  }
+
+  /* Quadratic-weighted Cohen's kappa on a fixed 1..K scale. */
+  function weightedKappa(a, b, K) {
+    K = K || 5;
+    var O = [], ra = new Array(K).fill(0), rb = new Array(K).fill(0), n = 0, i, j;
+    for (i = 0; i < K; i++) O.push(new Array(K).fill(0));
+    for (i = 0; i < a.length; i++) {
+      if (a[i] == null || b[i] == null) continue;
+      O[a[i] - 1][b[i] - 1]++; ra[a[i] - 1]++; rb[b[i] - 1]++; n++;
+    }
+    var num = 0, den = 0;
+    for (i = 0; i < K; i++) for (j = 0; j < K; j++) {
+      var w = (i - j) * (i - j);
+      num += w * O[i][j] / n;
+      den += w * (ra[i] / n) * (rb[j] / n);
+    }
+    return den === 0 ? 1 : 1 - num / den;
+  }
+
+  /* ---------- Analysis ---------- */
+  // opts: { exclude: {R6:true}, holdout: function(rid, seq) -> bool, toneSource: 'observed' | 'projected' }
+  function getScore(data, rid, i, d, opts) {
+    if (opts && opts.exclude && opts.exclude[rid]) return null;
+    if (opts && opts.holdout && opts.holdout(rid, i + 1)) return null;
+    if (d === 3 && opts && opts.toneSource === 'projected') return data.toneProjected[rid][i];
+    return data.ratings[rid][i][d];
+  }
+
+  function alphaFor(data, dims, opts) {
+    var units = [];
+    dims.forEach(function (d) {
+      for (var i = 0; i < data.items.length; i++) {
+        units.push(RATERS.map(function (rid) { return getScore(data, rid, i, d, opts); }));
+      }
+    });
+    return krippendorffInterval(units);
+  }
+
+  function analyze(data) {
+    var items = data.items, N = items.length, res = {};
+    var dimIdx = [0, 1, 2, 3];
+
+    // Alpha per dimension and overall
+    res.alpha = {};
+    DIMS.forEach(function (name, d) { res.alpha[name] = alphaFor(data, [d]); });
+    res.alpha.overall = alphaFor(data, dimIdx);
+
+    // Leave-one-out consensus
+    function loo(rid, i, d) {
+      var s = 0, c = 0;
+      RATERS.forEach(function (o) { if (o !== rid) { s += data.ratings[o][i][d]; c++; } });
+      return s / c;
+    }
+
+    // Pairwise kappa
+    res.kappa = {};
+    DIMS.forEach(function (name, d) {
+      var M = [];
+      RATERS.forEach(function (a) {
+        var row = [];
+        RATERS.forEach(function (b) {
+          if (a === b) { row.push(1); return; }
+          row.push(weightedKappa(data.ratings[a].map(function (x) { return x[d]; }), data.ratings[b].map(function (x) { return x[d]; })));
+        });
+        M.push(row);
+      });
+      res.kappa[name] = M;
+    });
+
+    // Per-rater stats
+    var goldIdx = []; items.forEach(function (it, i) { if (it.is_gold) goldIdx.push(i); });
+    res.goldCount = goldIdx.length;
+    res.raters = {};
+    RATERS.forEach(function (rid) {
+      var st = { id: rid, count: N * 4, camp: CAMP[rid] };
+      st.medianSeconds = median(data.seconds[rid]);
+      var within = 0, absErr = 0, tot = 0, perDimGold = [0, 0, 0, 0];
+      goldIdx.forEach(function (i) {
+        dimIdx.forEach(function (d) {
+          var e = Math.abs(data.ratings[rid][i][d] - items[i].gold_score[d]);
+          if (e <= 1) { within++; perDimGold[d]++; }
+          absErr += e; tot++;
+        });
+      });
+      st.goldAcc = within / tot; st.goldMAE = absErr / tot;
+      st.goldAccByDim = perDimGold.map(function (x) { return x / goldIdx.length; });
+      st.corrByDim = dimIdx.map(function (d) {
+        var x = [], y = [];
+        for (var i = 0; i < N; i++) { x.push(data.ratings[rid][i][d]); y.push(loo(rid, i, d)); }
+        return pearson(x, y);
+      });
+      st.corr = mean(st.corrByDim);
+      st.meanByDim = dimIdx.map(function (d) { return mean(data.ratings[rid].map(function (x) { return x[d]; })); });
+      st.meanBefore = mean(data.ratings[rid].slice(0, DRIFT_START - 1).map(function (x) { return mean(x); }));
+      st.meanAfter = mean(data.ratings[rid].slice(DRIFT_START - 1).map(function (x) { return mean(x); }));
+      st.kappaAvgByDim = DIMS.map(function (name) {
+        var row = res.kappa[name][RATERS.indexOf(rid)], s = 0;
+        row.forEach(function (v, j) { if (j !== RATERS.indexOf(rid)) s += v; });
+        return s / (RATERS.length - 1);
+      });
+
+      // Drift: per-item agreement = share of the 4 dimensions within ±1 of the LOO mean.
+      var agree = [], dev = [];
+      for (var i = 0; i < N; i++) {
+        var a = 0, e = 0;
+        dimIdx.forEach(function (d) { var diff = data.ratings[rid][i][d] - loo(rid, i, d); if (Math.abs(diff) <= RULES.agreeTolerance) a++; e += diff; });
+        agree.push(a / 4); dev.push(e / 4);
+      }
+      var W = RULES.windowSize, rolling = [];
+      for (var k = W - 1; k < N; k++) rolling.push({ seq: k + 1, value: mean(agree.slice(k - W + 1, k + 1)) });
+      st.rolling = rolling;
+      st.baseline = mean(agree.slice(0, N / 2));
+      var run = 0, best = 0, bestStart = null, curStart = null;
+      rolling.forEach(function (p) {
+        if (p.value < st.baseline - RULES.driftDrop) { if (run === 0) curStart = p.seq; run++; if (run > best) { best = run; bestStart = curStart; } }
+        else run = 0;
+      });
+      st.driftRun = best; st.driftRunStart = bestStart;
+      st.minRolling = Math.min.apply(null, rolling.map(function (p) { return p.value; }));
+      // Change point on signed deviation from consensus (two-segment least squares).
+      var bestK = null, bestSSE = Infinity;
+      for (var cp = 20; cp <= N - 20; cp++) {
+        var m1 = mean(dev.slice(0, cp)), m2 = mean(dev.slice(cp)), sse = 0;
+        for (var q = 0; q < N; q++) { var mm = q < cp ? m1 : m2; sse += (dev[q] - mm) * (dev[q] - mm); }
+        if (sse < bestSSE) { bestSSE = sse; bestK = cp; }
+      }
+      st.breakPoint = bestK + 1;   // first item of the new segment
+      st.devBefore = mean(dev.slice(0, bestK)); st.devAfter = mean(dev.slice(bestK));
+      st.agreeBefore = mean(agree.slice(0, bestK)); st.agreeAfter = mean(agree.slice(bestK));
+      res.raters[rid] = st;
+    });
+    res.groupMedianSeconds = median(RATERS.map(function (rid) { return res.raters[rid].medianSeconds; }));
+
+    // Flags
+    res.flags = [];
+    RATERS.forEach(function (rid) {
+      var st = res.raters[rid];
+      st.status = 'OK';
+      st.driftFlag = st.driftRun >= RULES.driftRun;
+      st.rushFlag = st.medianSeconds < RULES.rushTimeRatio * res.groupMedianSeconds && st.goldAcc < RULES.rushGoldAcc;
+      if (st.rushFlag) st.status = 'Rushing';
+      else if (st.driftFlag) st.status = 'Drift';
+    });
+    res.dimFlags = {};
+    DIMS.forEach(function (name) {
+      var othersOk = DIMS.every(function (o) { return o === name || res.alpha[o] >= RULES.ambiguousOthers; });
+      res.dimFlags[name] = res.alpha[name] < RULES.ambiguousAlpha && othersOk;
+    });
+
+    // Disagreement by category: mean within-item SD of the 6 ratings.
+    res.disagreement = {};
+    DIMS.forEach(function (name, d) {
+      res.disagreement[name] = CATS.map(function (c) {
+        var sds = [];
+        items.forEach(function (it, i) { if (it.category === c) sds.push(sd(RATERS.map(function (rid) { return data.ratings[rid][i][d]; }))); });
+        return { category: c, value: mean(sds) };
+      });
+    });
+
+    // Tone camp gap per item
+    res.toneItems = items.map(function (it, i) {
+      var r = {}; RATERS.forEach(function (rid) { r[rid] = data.ratings[rid][i][3]; });
+      var pro = (r.R1 + r.R3) / 2, user = (r.R2 + r.R5) / 2;
+      return { index: i, item: it, scores: r, proMean: pro, userMean: user, gap: user - pro,
+        sd: sd(RATERS.map(function (rid) { return r[rid]; })) };
+    }).sort(function (a, b) { return Math.abs(b.gap) - Math.abs(a.gap) || b.sd - a.sd || a.index - b.index; });
+
+    // Camp kappa summary for tone
+    var K = res.kappa.tone, ix = function (id) { return RATERS.indexOf(id); };
+    res.toneCamps = {
+      within: mean([K[ix('R1')][ix('R3')], K[ix('R2')][ix('R5')]]),
+      across: mean([K[ix('R1')][ix('R2')], K[ix('R1')][ix('R5')], K[ix('R3')][ix('R2')], K[ix('R3')][ix('R5')]])
+    };
+    res.toneByCatSplit = (function () {
+      var amb = [], other = [];
+      res.disagreement.tone.forEach(function (x) { (x.category === 'advice' || x.category === 'creative writing' ? amb : other).push(x.value); });
+      return { ambiguous: mean(amb), other: mean(other) };
+    })();
+
+    // After fixes
+    var flaggedRushers = {}, drifters = [];
+    RATERS.forEach(function (rid) { if (res.raters[rid].rushFlag) flaggedRushers[rid] = true; if (res.raters[rid].driftFlag && !res.raters[rid].rushFlag) drifters.push(rid); });
+    var holdFrom = {};
+    drifters.forEach(function (rid) { holdFrom[rid] = res.raters[rid].breakPoint; });
+    var afterOpts = {
+      exclude: flaggedRushers,
+      holdout: function (rid, seq) { return holdFrom[rid] !== undefined && seq >= holdFrom[rid]; }
+    };
+    res.fix = { excluded: Object.keys(flaggedRushers), heldOut: holdFrom };
+    res.after = {};
+    DIMS.forEach(function (name, d) {
+      res.after[name] = alphaFor(data, [d], d === 3 && res.dimFlags.tone ? Object.assign({ toneSource: 'projected' }, afterOpts) : afterOpts);
+    });
+    res.after.overall = alphaFor(data, dimIdx, Object.assign({ toneSource: res.dimFlags.tone ? 'projected' : 'observed' }, afterOpts));
+    res.after.toneObservedOnly = alphaFor(data, [3], afterOpts);   // tone with rater fixes only, no guideline change
+
+    // Impact on ratings
+    var total = N * RATERS.length * 4, affected = 0, byReason = { rushing: 0, drift: 0, tone: 0 };
+    var ambItems = items.filter(function (it) { return it.category === 'advice' || it.category === 'creative writing'; }).length;
+    RATERS.forEach(function (rid) {
+      for (var i = 0; i < N; i++) for (var d = 0; d < 4; d++) {
+        if (flaggedRushers[rid]) { byReason.rushing++; affected++; continue; }
+        if (holdFrom[rid] !== undefined && i + 1 >= holdFrom[rid]) { byReason.drift++; affected++; continue; }
+        if (d === 3 && res.dimFlags.tone && (items[i].category === 'advice' || items[i].category === 'creative writing')) { byReason.tone++; affected++; }
+      }
+    });
+    res.impact = { total: total, affected: affected, share: affected / total, byReason: byReason, ambiguousItems: ambItems,
+      itemsTouched: (function () {
+        var c = 0; items.forEach(function (it, i) {
+          var touched = Object.keys(flaggedRushers).length > 0 || drifters.some(function (rid) { return i + 1 >= holdFrom[rid]; }) ||
+            (res.dimFlags.tone && (it.category === 'advice' || it.category === 'creative writing'));
+          if (touched) c++;
+        }); return c; })() };
+    return res;
+  }
+
+  function verdict(a) {
+    if (a >= THRESH.reliable) return 'reliable';
+    if (a >= THRESH.tentative) return 'tentative';
+    return 'unreliable';
+  }
+
+  /* ---------- Self test ---------- */
+  function selfTest(log) {
+    log = log || function () { console.log.apply(console, arguments); };
+    var results = [];
+    function check(name, got, want, tol) {
+      var pass = Math.abs(got - want) <= (tol || 1e-9);
+      results.push(pass);
+      log((pass ? 'PASS' : 'FAIL') + '  ' + name + ': got ' + got.toFixed(4) + ', expected ' + want.toFixed(4));
+    }
+    // 1. Hand-computed: 3 units, 2 coders: (1,1), (2,3), (3,3).
+    //    n = 6, sum v = 13, sum v^2 = 33.  D_o = (1/6)*[(2-3)^2 + (3-2)^2]/1 = 1/3.
+    //    D_e = sum over ordered pairs of (vi-vj)^2 / (n(n-1)) = 2*(6*33 - 13^2)/30 = 58/30.
+    //    alpha = 1 - (1/3)/(58/30) = 1 - 10/58 = 0.827586...
+    var tiny = [[1, 1], [2, 3], [3, 3]];
+    check('alpha, hand-computed 3-unit example', krippendorffInterval(tiny), 1 - 10 / 58, 1e-9);
+    // 2. Krippendorff (2011), "Computing Krippendorff's Alpha-Reliability": 4 coders x 12 units with missing data.
+    //    Published values: nominal 0.743, interval 0.849.
+    var _ = null;
+    var A = [1, 2, 3, 3, 2, 1, 4, 1, 2, _, _, _];
+    var B = [1, 2, 3, 3, 2, 2, 4, 1, 2, 5, _, 3];
+    var C = [_, 3, 3, 3, 2, 3, 4, 2, 2, 5, 1, _];
+    var D = [1, 2, 3, 3, 2, 4, 4, 1, 2, 5, 1, _];
+    var units = A.map(function (_v, u) { return [A[u], B[u], C[u], D[u]]; });
+    check('alpha interval, Krippendorff 2011 example', krippendorffInterval(units), 0.849, 0.0005);
+    check('alpha nominal (reference impl), same example', krippendorffGeneric(units, function (a, b) { return a === b ? 0 : 1; }), 0.743, 0.0005);
+    check('fast interval == pairwise reference', krippendorffInterval(units), krippendorffGeneric(units, function (a, b) { return (a - b) * (a - b); }), 1e-9);
+    check('alpha, perfect agreement', krippendorffInterval([[1, 1], [3, 3], [5, 5, 5]]), 1, 1e-12);
+    // 3. Quadratic weighted kappa
+    check('kappa, identical ratings', weightedKappa([1, 2, 3, 4, 5], [1, 2, 3, 4, 5]), 1, 1e-12);
+    check('kappa, reversed [1,2,3] vs [3,2,1]', weightedKappa([1, 2, 3], [3, 2, 1]), -1, 1e-12);
+    // 4. Pearson
+    check('pearson, linear', pearson([1, 2, 3, 4], [2, 4, 6, 8]), 1, 1e-12);
+    var ok = results.every(Boolean);
+    log('selfTest: ' + (ok ? 'PASS' : 'FAIL') + ' (' + results.filter(Boolean).length + '/' + results.length + ' checks)');
+    return ok;
+  }
+
+  return {
+    SEED: SEED, N_ITEMS: N_ITEMS, DRIFT_START: DRIFT_START, DRIFT_SHIFT: DRIFT_SHIFT, NOISE_SD: NOISE_SD,
+    RATERS: RATERS, DIMS: DIMS, DIM_LABEL: DIM_LABEL, DIM_DEF: DIM_DEF, CATS: CATS, CAMP: CAMP, CAMP_LABEL: CAMP_LABEL,
+    THRESH: THRESH, RULES: RULES, BIAS: BIAS,
+    generate: generate, analyze: analyze, verdict: verdict, selfTest: selfTest,
+    krippendorffInterval: krippendorffInterval, weightedKappa: weightedKappa, pearson: pearson, median: median, mean: mean
+  };
+})();
+
+</script>
+<script id="ui">
+(function () {
+  'use strict';
+  var E = Engine;
+  var data = E.generate();
+  var M = E.analyze(data);
+  var R = E.RATERS, DIMS = E.DIMS, L = E.DIM_LABEL;
+  window.selfTest = function () { return E.selfTest(); };
+  window.Concord = { data: data, metrics: M };
+  E.selfTest();
+
+  /* ---------- helpers ---------- */
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function f2(x) { return x.toFixed(2); }
+  function pct(x) { return Math.round(x * 100) + '%'; }
+  function num(n) { return n.toLocaleString('en-US'); }
+  function sgn(x, d) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d == null ? 2 : d); }
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function lin(d0, d1, r0, r1) { return function (v) { return r0 + (v - d0) / (d1 - d0) * (r1 - r0); }; }
+
+  var ICON = {
+    check: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>',
+    warn: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.2L14.5 13.5h-13z"/><path d="M8 6.5v3.2M8 11.6v.1"/></svg>',
+    x: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4"/></svg>',
+    trend: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5l4.5 4.5 3-3L14 11"/><path d="M10.5 11H14V7.5"/></svg>',
+    bolt: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M9 1.8L3.5 9h4l-1 5.2L12.5 7h-4z"/></svg>',
+    book: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3h4a1.5 1.5 0 0 1 1.5 1.5V13a1.2 1.2 0 0 0-1.2-1.2H2.5zM13.5 3h-4A1.5 1.5 0 0 0 8 4.5V13a1.2 1.2 0 0 1 1.2-1.2h4.3z"/></svg>',
+    copy: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M3 10.5V3.8C3 3.3 3.3 3 3.8 3h6.7"/></svg>',
+    print: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6V2.5h7V6M4.5 11.5h-2v-5h11v5h-2"/><rect x="4.5" y="9.5" width="7" height="4"/></svg>',
+    caret: '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>'
+  };
+  var ALPHA_STATUS = {
+    reliable: { cls: 'good', icon: ICON.check, label: 'Reliable' },
+    tentative: { cls: 'warn', icon: ICON.warn, label: 'Tentative' },
+    unreliable: { cls: 'bad', icon: ICON.x, label: 'Unreliable' }
+  };
+  var RATER_STATUS = {
+    OK: { cls: 'good', icon: ICON.check, label: 'OK' },
+    Drift: { cls: 'warn', icon: ICON.trend, label: 'Drift' },
+    Rushing: { cls: 'bad', icon: ICON.bolt, label: 'Rushing' }
+  };
+  function alphaBadge(a) { var s = ALPHA_STATUS[E.verdict(a)]; return '<span class="status ' + s.cls + '">' + s.icon + s.label + '</span>'; }
+  function raterBadge(st) { var s = RATER_STATUS[st]; return '<span class="status ' + s.cls + '">' + s.icon + s.label + '</span>'; }
+
+  /* ---------- derived facts used across views ---------- */
+  var rushers = R.filter(function (r) { return M.raters[r].rushFlag; });
+  var drifters = R.filter(function (r) { return M.raters[r].driftFlag && !M.raters[r].rushFlag; });
+  var ambDims = DIMS.filter(function (d) { return M.dimFlags[d]; });
+  var healthyDims = DIMS.filter(function (d) { return !M.dimFlags[d]; });
+  var raterIssues = rushers.length + drifters.length, rubricIssues = ambDims.length;
+  var others = function (exclude) { return R.filter(function (r) { return exclude.indexOf(r) < 0; }); };
+  var okRaters = R.filter(function (r) { return M.raters[r].status === 'OK'; });
+  var okGoldMin = Math.min.apply(null, okRaters.map(function (r) { return M.raters[r].goldAcc; }));
+  function goldPhrase(x) { return x >= 0.995 ? '100%' : pct(x) + ' or better'; }
+  var healthyAlphaMin = Math.min.apply(null, healthyDims.map(function (d) { return M.alpha[d]; }));
+  var healthyAlphaMax = Math.max.apply(null, healthyDims.map(function (d) { return M.alpha[d]; }));
+  var ambSplit = M.toneByCatSplit;
+  var DR = drifters[0], RU = rushers[0];
+  var dSt = DR ? M.raters[DR] : null, rSt = RU ? M.raters[RU] : null;
+  var ratingsTotal = M.impact.total;
+
+  /* ---------- header, tabs ---------- */
+  $('#meta').innerHTML =
+    '<span>Customer <b>Northwind AI</b> <span class="pill">fictional</span></span>' +
+    '<span>Project <b>Assistant response quality, batch 3</b></span>' +
+    '<span><b>' + data.items.length + '</b> items · <b>' + R.length + '</b> raters · <b>' + DIMS.length + '</b> dimensions</span>' +
+    '<span class="pill">Synthetic demo data · seed ' + E.SEED + '</span>';
+
+  var VIEWS = [
+    { id: 'overview', label: 'Data health' },
+    { id: 'raters', label: 'Raters' },
+    { id: 'rubric', label: 'Rubric' },
+    { id: 'summary', label: 'Customer summary' },
+    { id: 'method', label: 'Methodology' }
+  ];
+  $('#tabs').innerHTML = VIEWS.map(function (v, i) {
+    return '<button role="tab" id="tab-' + v.id + '" aria-controls="view-' + v.id + '" data-view="' + v.id + '"><span class="num">' + (i + 1) + '</span>' + v.label + '</button>';
+  }).join('');
+  function show(id, focusSel) {
+    if (!VIEWS.some(function (v) { return v.id === id; })) id = 'overview';
+    VIEWS.forEach(function (v) {
+      $('#view-' + v.id).classList.toggle('active', v.id === id);
+      $('#tab-' + v.id).setAttribute('aria-selected', v.id === id ? 'true' : 'false');
+    });
+    if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id);
+    if (focusSel) { var el = $(focusSel); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    else window.scrollTo(0, 0);
+  }
+  $('#tabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-view]'); if (b) show(b.dataset.view); });
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-goto]');
+    if (!a) return;
+    e.preventDefault();
+    if (a.dataset.rater) selectRater(a.dataset.rater);
+    if (a.dataset.dim) selectDim(a.dataset.dim);
+    show(a.dataset.goto, a.dataset.focus);
+  });
+
+  /* ---------- tooltip ---------- */
+  var tip = $('#tip');
+  function showTip(html, x, y) {
+    tip.innerHTML = html; tip.classList.add('on');
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    var left = x + 14, top = y + 14;
+    if (left + w > window.innerWidth - 8) left = x - w - 14;
+    if (top + h > window.innerHeight - 8) top = y - h - 14;
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  }
+  function hideTip() { tip.classList.remove('on'); }
+  document.addEventListener('mousemove', function (e) {
+    var t = e.target.closest && e.target.closest('[data-tip]');
+    if (t) showTip(t.getAttribute('data-tip'), e.clientX, e.clientY);
+    else if (!e.target.closest || !e.target.closest('[data-crosshair]')) hideTip();
+  });
+
+  /* ---------- chart: alpha bars with threshold bands ---------- */
+  function bands(x, top, h) {
+    return '<rect x="' + x(0) + '" y="' + top + '" width="' + (x(E.THRESH.tentative) - x(0)) + '" height="' + h + '" fill="var(--band-bad)"/>' +
+      '<rect x="' + x(E.THRESH.tentative) + '" y="' + top + '" width="' + (x(E.THRESH.reliable) - x(E.THRESH.tentative)) + '" height="' + h + '" fill="var(--band-warn)"/>' +
+      '<rect x="' + x(E.THRESH.reliable) + '" y="' + top + '" width="' + (x(1) - x(E.THRESH.reliable)) + '" height="' + h + '" fill="var(--band-good)"/>';
+  }
+  function bandLabels(x, y) {
+    return '<text x="' + (x(0) + x(E.THRESH.tentative)) / 2 + '" y="' + y + '" text-anchor="middle" font-size="11" fill="var(--bad)">Unreliable &lt; 0.667</text>' +
+      '<text x="' + (x(E.THRESH.tentative) + x(E.THRESH.reliable)) / 2 + '" y="' + y + '" text-anchor="middle" font-size="11" fill="var(--warn)">Tentative</text>' +
+      '<text x="' + (x(E.THRESH.reliable) + x(1)) / 2 + '" y="' + y + '" text-anchor="middle" font-size="11" fill="var(--good)">Reliable ≥ 0.80</text>';
+  }
+  function xAxis(x, y, ticks, fmt) {
+    return '<g class="axis">' + ticks.map(function (t) {
+      return '<line x1="' + x(t) + '" x2="' + x(t) + '" y1="' + y + '" y2="' + (y + 4) + '"/><text x="' + x(t) + '" y="' + (y + 16) + '" text-anchor="middle">' + (fmt ? fmt(t) : t) + '</text>';
+    }).join('') + '</g>';
+  }
+
+  function bandLegend(extra) {
+    return '<div class="legend">' + (extra || '') +
+      '<span class="lg"><i style="background:var(--band-bad);border-color:#ecc9c4"></i>Unreliable &lt; 0.667</span>' +
+      '<span class="lg"><i style="background:var(--band-warn);border-color:#ecd9b0"></i>Tentative 0.667–0.80</span>' +
+      '<span class="lg"><i style="background:var(--band-good);border-color:#c5e0cf"></i>Reliable ≥ 0.80</span></div>';
+  }
+  function alphaBarsChart() {
+    var rows = DIMS.map(function (d) { return { key: d, label: L[d], v: M.alpha[d] }; });
+    rows.push({ key: 'overall', label: 'All dimensions', v: M.alpha.overall });
+    var W = 560, lm = 150, rm = 110, rowH = 40, top = 10, H = top + rows.length * rowH + 40;
+    var x = lin(0, 1, lm, W - rm);
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Krippendorff alpha by rubric dimension">';
+    s += bands(x, top - 6, rows.length * rowH + 4);
+    rows.forEach(function (r, i) {
+      var y = top + i * rowH + 8, bh = 18, st = ALPHA_STATUS[E.verdict(r.v)];
+      if (r.key === 'overall') s += '<line x1="' + lm + '" x2="' + (W - rm) + '" y1="' + (y - 9) + '" y2="' + (y - 9) + '" stroke="var(--line)"/>';
+      s += '<text x="' + (lm - 10) + '" y="' + (y + 13) + '" text-anchor="end" font-size="13" fill="var(--ink)"' + (r.key === 'overall' ? ' font-weight="600"' : '') + '>' + r.label + '</text>';
+      var fill = r.key === 'overall' ? 'var(--ink-2)' : (E.verdict(r.v) === 'unreliable' ? 'var(--bad)' : 'var(--accent)');
+      s += '<path d="M' + x(0) + ' ' + y + 'h' + (x(r.v) - x(0) - 4) + 'a4 4 0 0 1 4 4v' + (bh - 8) + 'a4 4 0 0 1 -4 4h' + (-(x(r.v) - x(0) - 4)) + 'z" fill="' + fill + '"/>';
+      s += '<text x="' + (x(r.v) + 6) + '" y="' + (y + 13) + '" font-size="13" font-weight="600" fill="var(--ink)">' + f2(r.v) + '</text>';
+      s += '<text x="' + (W - rm + 10) + '" y="' + (y + 13) + '" font-size="12" fill="var(--' + st.cls + ')">' + (st.cls === 'good' ? '✓ ' : st.cls === 'warn' ? '! ' : '✕ ') + st.label + '</text>';
+      s += '<rect class="hit" x="' + lm + '" y="' + (y - 8) + '" width="' + (W - rm - lm) + '" height="' + rowH + '" fill="transparent" data-tip="' + esc('<b>' + r.label + '</b><br>Krippendorff’s α = ' + r.v.toFixed(3) + ' (' + st.label.toLowerCase() + ')') + '"/>';
+    });
+    var axisY = top + rows.length * rowH + 2;
+    s += xAxis(x, axisY, [0, 0.2, 0.4, 0.6, 0.8, 1], function (t) { return t.toFixed(1); });
+    s += '<text class="axis-label" x="' + (lm + x(1)) / 2 + '" y="' + (axisY + 32) + '" text-anchor="middle">Krippendorff’s α (interval)</text>';
+    return s + '</svg>';
+  }
+
+  function beforeAfterChart() {
+    var rows = DIMS.map(function (d) { return { key: d, label: L[d], a: M.alpha[d], b: M.after[d], projected: d === 'tone' && M.dimFlags.tone }; });
+    rows.push({ key: 'overall', label: 'All dimensions', a: M.alpha.overall, b: M.after.overall, projected: M.dimFlags.tone });
+    var W = 560, lm = 150, rm = 110, rowH = 40, top = 10, H = top + rows.length * rowH + 40;
+    var x = lin(0.5, 1, lm, W - rm);
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Alpha before and after fixes">';
+    s += '<rect x="' + x(0.5) + '" y="' + (top - 6) + '" width="' + (x(E.THRESH.tentative) - x(0.5)) + '" height="' + (rows.length * rowH + 4) + '" fill="var(--band-bad)"/>' +
+      '<rect x="' + x(E.THRESH.tentative) + '" y="' + (top - 6) + '" width="' + (x(E.THRESH.reliable) - x(E.THRESH.tentative)) + '" height="' + (rows.length * rowH + 4) + '" fill="var(--band-warn)"/>' +
+      '<rect x="' + x(E.THRESH.reliable) + '" y="' + (top - 6) + '" width="' + (x(1) - x(E.THRESH.reliable)) + '" height="' + (rows.length * rowH + 4) + '" fill="var(--band-good)"/>';
+    rows.forEach(function (r, i) {
+      var y = top + i * rowH + 17;
+      if (r.key === 'overall') s += '<line x1="' + lm + '" x2="' + (W - rm) + '" y1="' + (y - 18) + '" y2="' + (y - 18) + '" stroke="var(--line)"/>';
+      s += '<text x="' + (lm - 10) + '" y="' + (y + 4) + '" text-anchor="end" font-size="13" fill="var(--ink)"' + (r.key === 'overall' ? ' font-weight="600"' : '') + '>' + r.label + '</text>';
+      s += '<line x1="' + x(r.a) + '" x2="' + (x(r.b) - 7) + '" y1="' + y + '" y2="' + y + '" stroke="var(--ink-2)" stroke-width="2"' + (r.projected ? ' stroke-dasharray="4 3"' : '') + '/>';
+      s += '<path d="M' + (x(r.b) - 11) + ' ' + (y - 4) + 'l5 4 -5 4" fill="none" stroke="var(--ink-2)" stroke-width="2"/>';
+      s += '<circle cx="' + x(r.a) + '" cy="' + y + '" r="5.5" fill="var(--muted)" stroke="var(--surface)" stroke-width="2"/>';
+      s += r.projected
+        ? '<circle cx="' + x(r.b) + '" cy="' + y + '" r="5.5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2.2" stroke-dasharray="3 2"/>'
+        : '<circle cx="' + x(r.b) + '" cy="' + y + '" r="6" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>';
+      s += '<text x="' + (x(r.a) - 9) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11.5" fill="var(--ink-2)">' + f2(r.a) + '</text>';
+      s += '<text x="' + (W - rm + 10) + '" y="' + (y + 4) + '" font-size="12.5" font-weight="600" fill="var(--ink)">' + f2(r.b) + (r.projected ? '<tspan font-weight="400" fill="var(--accent)" font-size="11.5"> projected</tspan>' : '') + '</text>';
+      s += '<rect class="hit" x="' + lm + '" y="' + (y - 18) + '" width="' + (W - lm) + '" height="' + rowH + '" fill="transparent" data-tip="' + esc('<b>' + r.label + '</b><br>Now: α = ' + r.a.toFixed(3) + '<br>After fixes: α = ' + r.b.toFixed(3) + (r.projected ? ' (projected)' : ' (recomputed)')) + '"/>';
+    });
+    var axisY = top + rows.length * rowH + 2;
+    s += xAxis(x, axisY, [0.5, 0.6, 0.7, 0.8, 0.9, 1], function (t) { return t.toFixed(1); });
+    s += '<text class="axis-label" x="' + (lm + x(1)) / 2 + '" y="' + (axisY + 32) + '" text-anchor="middle">Krippendorff’s α (interval)</text>';
+    return s + '</svg>';
+  }
+
+  /* ---------- chart: drift ---------- */
+  var COLOR = function (rid) { return rid === DR ? 'var(--accent)' : rid === RU ? 'var(--series-r6)' : 'var(--series-other)'; };
+  function driftChart() {
+    var W = 1100, H = 360, lm = 66, rm = 70, tm = 30, bm = 50;
+    var x = lin(1, 240, lm, W - rm), y = lin(0, 1, H - bm, tm);
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Rolling agreement with other raters by item sequence">';
+    [0, 0.2, 0.4, 0.6, 0.8, 1].forEach(function (t) {
+      s += '<line class="grid-line" x1="' + lm + '" x2="' + (W - rm) + '" y1="' + y(t) + '" y2="' + y(t) + '"/>';
+      s += '<text class="axis" x="' + (lm - 8) + '" y="' + (y(t) + 4) + '" text-anchor="end" font-size="11" fill="var(--muted)">' + pct(t) + '</text>';
+    });
+    s += xAxis(x, H - bm, [1, 30, 60, 90, 120, 150, 180, 210, 240]);
+    s += '<text class="axis-label" x="' + (lm + W - rm) / 2 + '" y="' + (H - 12) + '" text-anchor="middle">Item sequence index (each point = trailing window of ' + E.RULES.windowSize + ' items ending here)</text>';
+    s += '<text class="axis-label" transform="translate(14 ' + (tm + H - bm) / 2 + ') rotate(-90)" text-anchor="middle">Agreement with other raters</text>';
+    if (dSt) {
+      var thr = dSt.baseline - E.RULES.driftDrop, bp = dSt.breakPoint;
+      // flagged run shading
+      if (dSt.driftRunStart) {
+        var x0 = x(dSt.driftRunStart), x1 = x(dSt.driftRunStart + dSt.driftRun - 1);
+        s += '<rect x="' + x0 + '" y="' + tm + '" width="' + Math.max(2, x1 - x0) + '" height="' + (H - bm - tm) + '" fill="var(--warn-soft)" opacity=".7"/>';
+        s += '<text x="' + (x0 + 6) + '" y="' + (tm + 14) + '" font-size="11.5" fill="var(--warn)">⚑ ' + DR + ' flagged: ' + dSt.driftRun + ' consecutive windows below threshold</text>';
+      }
+      s += '<line x1="' + lm + '" x2="' + (W - rm) + '" y1="' + y(dSt.baseline) + '" y2="' + y(dSt.baseline) + '" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3" opacity=".7"/>';
+      s += '<line x1="' + lm + '" x2="' + (W - rm) + '" y1="' + y(thr) + '" y2="' + y(thr) + '" stroke="var(--warn)" stroke-width="1.2" stroke-dasharray="6 4"/>';
+      s += '<line x1="' + x(bp) + '" x2="' + x(bp) + '" y1="' + (tm - 4) + '" y2="' + (H - bm) + '" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="3 3"/>';
+      s += '<text x="' + (x(bp) - 6) + '" y="' + (tm - 10) + '" font-size="12" font-weight="600" text-anchor="end" fill="var(--ink)">' + DR + ' break ≈ item ' + bp + ' (change-point estimate)</text>';
+    }
+    // lines: others first, highlighted last
+    var order = R.filter(function (r) { return r !== DR && r !== RU; }).concat([RU, DR].filter(Boolean));
+    var ends = [];
+    order.forEach(function (rid) {
+      var pts = M.raters[rid].rolling;
+      var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + x(p.seq).toFixed(1) + ' ' + y(p.value).toFixed(1); }).join('');
+      var hl = rid === DR || rid === RU;
+      s += '<path d="' + d + '" fill="none" stroke="' + COLOR(rid) + '" stroke-width="' + (hl ? 2.4 : 1.6) + '" stroke-linejoin="round"/>';
+      var last = pts[pts.length - 1];
+      ends.push({ rid: rid, y: y(last.value), hl: hl });
+    });
+    // direct labels with simple collision avoidance
+    ends.sort(function (a, b) { return a.y - b.y; });
+    for (var i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+    ends.forEach(function (e) {
+      s += '<text x="' + (W - rm + 8) + '" y="' + (e.y + 4) + '" font-size="12" font-weight="' + (e.hl ? 700 : 500) + '" fill="' + (e.hl ? 'var(--ink)' : 'var(--muted)') + '">' + e.rid + (e.rid === DR ? ' · drift' : e.rid === RU ? ' · rushing' : '') + '</text>';
+    });
+    s += '<line id="drift-cross" x1="0" x2="0" y1="' + tm + '" y2="' + (H - bm) + '" stroke="var(--ink)" stroke-width="1" opacity="0"/>';
+    s += '<rect data-crosshair="drift" x="' + lm + '" y="' + tm + '" width="' + (W - rm - lm) + '" height="' + (H - bm - tm) + '" fill="transparent"/>';
+    return s + '</svg>';
+  }
+  function attachDrift() {
+    var svg = $('#drift-chart svg'); if (!svg) return;
+    var hit = $('[data-crosshair="drift"]', svg), line = $('#drift-cross', svg);
+    var W = 1100, lm = 66, rm = 70;
+    hit.addEventListener('mousemove', function (e) {
+      var rect = svg.getBoundingClientRect();
+      var px = (e.clientX - rect.left) * (W / rect.width);
+      var seq = Math.round(1 + (px - lm) / (W - rm - lm) * 239);
+      seq = Math.max(E.RULES.windowSize, Math.min(240, seq));
+      var xv = lm + (seq - 1) / 239 * (W - rm - lm);
+      line.setAttribute('x1', xv); line.setAttribute('x2', xv); line.setAttribute('opacity', '.35');
+      var idx = seq - E.RULES.windowSize;
+      var rows = R.map(function (rid) { return { rid: rid, v: M.raters[rid].rolling[idx].value }; }).sort(function (a, b) { return b.v - a.v; });
+      showTip('<b>Items ' + (seq - E.RULES.windowSize + 1) + '–' + seq + '</b><br>' + rows.map(function (r) {
+        return (r.rid === DR || r.rid === RU ? '<b>' + r.rid + '</b>' : r.rid) + ': ' + pct(r.v);
+      }).join('<br>'), e.clientX, e.clientY);
+    });
+    hit.addEventListener('mouseleave', function () { line.setAttribute('opacity', '0'); hideTip(); });
+  }
+
+  /* ---------- chart: speed vs gold accuracy ---------- */
+  function speedChart() {
+    var W = 480, H = 360, lm = 60, rm = 20, tm = 20, bm = 50;
+    var x = lin(0, 70, lm, W - rm), y = lin(0.5, 1.02, H - bm, tm);
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Median seconds per item versus gold accuracy">';
+    var rx = E.RULES.rushTimeRatio * M.groupMedianSeconds, ry = E.RULES.rushGoldAcc;
+    s += '<rect x="' + x(0) + '" y="' + y(ry) + '" width="' + (x(rx) - x(0)) + '" height="' + (y(0.5) - y(ry)) + '" fill="var(--bad-soft)"/>';
+    s += '<text x="' + (x(0) + 6) + '" y="' + (y(0.5) - 8) + '" font-size="11" fill="var(--bad)">Rushing rule zone</text>';
+    [0.5, 0.6, 0.7, 0.8, 0.9, 1].forEach(function (t) {
+      s += '<line class="grid-line" x1="' + lm + '" x2="' + (W - rm) + '" y1="' + y(t) + '" y2="' + y(t) + '"/>';
+      s += '<text x="' + (lm - 8) + '" y="' + (y(t) + 4) + '" text-anchor="end" font-size="11" fill="var(--muted)">' + pct(t) + '</text>';
+    });
+    s += '<line x1="' + x(rx) + '" x2="' + x(rx) + '" y1="' + tm + '" y2="' + (H - bm) + '" stroke="var(--bad)" stroke-dasharray="4 3" opacity=".7"/>';
+    s += '<text x="' + (x(rx) + 5) + '" y="' + y(0.8) + '" font-size="11" fill="var(--bad)">40% of group median (' + rx.toFixed(0) + ' s)</text>';
+    s += '<line x1="' + lm + '" x2="' + (W - rm) + '" y1="' + y(ry) + '" y2="' + y(ry) + '" stroke="var(--bad)" stroke-dasharray="4 3" opacity=".7"/>';
+    s += '<text x="' + (W - rm) + '" y="' + (y(ry) - 5) + '" text-anchor="end" font-size="11" fill="var(--bad)">70% gold accuracy</text>';
+    s += '<line x1="' + x(M.groupMedianSeconds) + '" x2="' + x(M.groupMedianSeconds) + '" y1="' + tm + '" y2="' + (H - bm) + '" stroke="var(--line)" />';
+    s += '<text x="' + (x(M.groupMedianSeconds) - 4) + '" y="' + (y(0.5) - 8) + '" text-anchor="end" font-size="11" fill="var(--muted)">group median ' + M.groupMedianSeconds + ' s</text>';
+    s += xAxis(x, H - bm, [0, 10, 20, 30, 40, 50, 60, 70], function (t) { return t + ' s'; });
+    s += '<text class="axis-label" x="' + (lm + W - rm) / 2 + '" y="' + (H - 12) + '" text-anchor="middle">Median seconds per item</text>';
+    s += '<text class="axis-label" transform="translate(14 ' + (tm + H - bm) / 2 + ') rotate(-90)" text-anchor="middle">Gold accuracy (within ±1)</text>';
+    var pts = R.map(function (rid) { var st = M.raters[rid]; return { rid: rid, cx: x(st.medianSeconds), cy: y(st.goldAcc), st: st }; });
+    var LABEL_POS = { R1: [0, -12], R2: [-14, -12], R3: [0, -12], R4: [0, 22], R5: [-16, 4], R6: [0, -12] };
+    pts.slice().sort(function (a, b) { return a.cx - b.cx; }).forEach(function (p, i) {
+      var hl = p.rid === RU || p.rid === DR;
+      s += '<circle cx="' + p.cx + '" cy="' + p.cy + '" r="' + (hl ? 7 : 6) + '" fill="' + COLOR(p.rid) + '" stroke="var(--surface)" stroke-width="2"/>';
+      var off = LABEL_POS[p.rid] || [0, -12]; void i;
+      s += '<text x="' + (p.cx + off[0]) + '" y="' + (p.cy + off[1]) + '" text-anchor="' + (off[0] < 0 ? 'end' : 'middle') + '" font-size="12" font-weight="' + (hl ? 700 : 500) + '" fill="var(--ink)">' + p.rid + '</text>';
+      s += '<circle class="hit" cx="' + p.cx + '" cy="' + p.cy + '" r="13" fill="transparent" data-tip="' + esc('<b>' + p.rid + '</b> · ' + p.st.status + '<br>Median ' + p.st.medianSeconds + ' s per item<br>Gold accuracy ' + pct(p.st.goldAcc) + ' · MAE ' + f2(p.st.goldMAE)) + '"/>';
+    });
+    return s + '</svg>';
+  }
+
+  /* ---------- chart: kappa heatmap ---------- */
+  var HEAT_ORDER = ['R1', 'R3', 'R2', 'R5', 'R4', 'R6'];
+  function heatColor(v) {
+    var t = Math.max(0, Math.min(1, (v - 0.3) / 0.7));
+    var a = [238, 243, 252], b = [24, 66, 160];
+    return 'rgb(' + a.map(function (c, i) { return Math.round(c + (b[i] - c) * t); }).join(',') + ')';
+  }
+  function heatmap(dim) {
+    var K = M.kappa[dim], cell = 54, lm = 44, tm = 52, W = lm + cell * 6 + 10, H = tm + cell * 6 + 70;
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Pairwise quadratic weighted kappa heatmap">';
+    // camp brackets
+    var camps = [{ label: 'Professional camp', from: 0, to: 1, cls: '#8ea6e3' }, { label: "User's-context camp", from: 2, to: 3, cls: '#d9a983' }];
+    camps.forEach(function (c) {
+      var x0 = lm + c.from * cell + 4, x1 = lm + (c.to + 1) * cell - 4;
+      s += '<path d="M' + x0 + ' ' + (tm - 22) + 'v-5h' + (x1 - x0) + 'v5" fill="none" stroke="' + c.cls + '" stroke-width="2"/>';
+      s += '<text x="' + (x0 + x1) / 2 + '" y="' + (tm - 32) + '" text-anchor="middle" font-size="11" fill="var(--ink-2)">' + c.label + '</text>';
+    });
+    HEAT_ORDER.forEach(function (a, i) {
+      s += '<text x="' + (lm + i * cell + cell / 2) + '" y="' + (tm - 6) + '" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink-2)">' + a + '</text>';
+      s += '<text x="' + (lm - 8) + '" y="' + (tm + i * cell + cell / 2 + 4) + '" text-anchor="end" font-size="12" font-weight="600" fill="var(--ink-2)">' + a + '</text>';
+      HEAT_ORDER.forEach(function (b, j) {
+        var v = K[R.indexOf(a)][R.indexOf(b)], diag = i === j;
+        var fill = diag ? 'var(--line-2)' : heatColor(v);
+        var tx = (!diag && (v - 0.3) / 0.7 > 0.55) ? '#fff' : 'var(--ink)';
+        s += '<rect x="' + (lm + j * cell + 1) + '" y="' + (tm + i * cell + 1) + '" width="' + (cell - 2) + '" height="' + (cell - 2) + '" rx="3" fill="' + fill + '"' +
+          (diag ? '' : ' data-tip="' + esc('<b>' + a + ' × ' + b + '</b> · ' + L[dim] + '<br>Quadratic weighted κ = ' + v.toFixed(3)) + '"') + '/>';
+        s += '<text x="' + (lm + j * cell + cell / 2) + '" y="' + (tm + i * cell + cell / 2 + 4) + '" text-anchor="middle" font-size="12" fill="' + tx + '" pointer-events="none">' + (diag ? '—' : f2(v)) + '</text>';
+      });
+    });
+    // legend ramp
+    var ly = tm + cell * 6 + 22, lw = cell * 6;
+    for (var k = 0; k < 20; k++) s += '<rect x="' + (lm + k * lw / 20) + '" y="' + ly + '" width="' + (lw / 20 + 0.5) + '" height="10" fill="' + heatColor(0.3 + 0.7 * k / 19) + '"/>';
+    s += '<text x="' + lm + '" y="' + (ly + 24) + '" font-size="11" fill="var(--muted)">κ ≤ 0.30</text><text x="' + (lm + lw) + '" y="' + (ly + 24) + '" text-anchor="end" font-size="11" fill="var(--muted)">1.00</text>';
+    s += '<text x="' + (lm + lw / 2) + '" y="' + (ly + 24) + '" text-anchor="middle" font-size="11" fill="var(--ink-2)">Quadratic weighted κ</text>';
+    return s + '</svg>';
+  }
+
+  /* ---------- chart: disagreement by category (small multiples) ---------- */
+  function catMultiples() {
+    var maxV = 0;
+    DIMS.forEach(function (d) { M.disagreement[d].forEach(function (c) { maxV = Math.max(maxV, c.value); }); });
+    maxV = Math.ceil(maxV * 5) / 5;
+    return '<div class="grid g4">' + DIMS.map(function (d) {
+      var W = 270, lm = 104, rm = 34, rowH = 26, tm = 8, H = tm + rowH * 5 + 36;
+      var x = lin(0, maxV, lm, W - rm);
+      var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Mean rating spread by category for ' + L[d] + '">';
+      [0, maxV / 2, maxV].forEach(function (t) { s += '<line class="grid-line" x1="' + x(t) + '" x2="' + x(t) + '" y1="' + tm + '" y2="' + (tm + rowH * 5) + '"/>'; });
+      M.disagreement[d].forEach(function (c, i) {
+        var y = tm + i * rowH + 5, bh = 15;
+        var hl = M.dimFlags[d] && (c.category === 'advice' || c.category === 'creative writing');
+        s += '<text x="' + (lm - 8) + '" y="' + (y + 12) + '" text-anchor="end" font-size="12" fill="var(--ink-2)">' + c.category + '</text>';
+        var w = Math.max(4, x(c.value) - x(0));
+        s += '<path d="M' + x(0) + ' ' + y + 'h' + (w - 4) + 'a4 4 0 0 1 4 4v' + (bh - 8) + 'a4 4 0 0 1 -4 4h' + (-(w - 4)) + 'z" fill="' + (hl ? 'var(--bad)' : 'var(--series-other)') + '"/>';
+        s += '<text x="' + (x(c.value) + 5) + '" y="' + (y + 12) + '" font-size="11.5" fill="var(--ink)"' + (hl ? ' font-weight="700"' : '') + '>' + f2(c.value) + '</text>';
+        s += '<rect class="hit" x="0" y="' + (y - 5) + '" width="' + W + '" height="' + rowH + '" fill="transparent" data-tip="' + esc('<b>' + L[d] + ' · ' + c.category + '</b><br>Mean spread (SD) of the 6 ratings per item: ' + c.value.toFixed(2) + ' scale points') + '"/>';
+      });
+      s += xAxis(x, tm + rowH * 5, [0, maxV / 2, maxV], function (t) { return t.toFixed(1); });
+      s += '<text class="axis-label" x="' + (lm + W - rm) / 2 + '" y="' + (H - 2) + '" text-anchor="middle">Mean SD of ratings per item</text>';
+      return '<div><h4>' + L[d] + (M.dimFlags[d] ? ' <span class="status bad">' + ICON.x + 'Flagged</span>' : '') + '</h4>' + s + '</svg></div>';
+    }).join('') + '</div>';
+  }
+
+  /* ================= VIEW 1: OVERVIEW ================= */
+  function renderOverview() {
+    var ready = raterIssues + rubricIssues === 0;
+    var parts = [];
+    if (raterIssues) parts.push(raterIssues + ' rater issue' + (raterIssues > 1 ? 's' : ''));
+    if (rubricIssues) parts.push(rubricIssues + ' rubric issue' + (rubricIssues > 1 ? 's' : ''));
+    var headline = ready ? 'Batch 3 is ready to ship: no rater or rubric issues were flagged.'
+      : 'Batch 3 is not ready to ship: ' + parts.join(' and ') + ' affect ' + pct(M.impact.share) + ' of ratings.';
+    var h = '<div class="card verdict' + (ready ? ' ok' : '') + '"><div class="icon">' + (ready ? ICON.check : ICON.x).replace('<svg', '<svg width="18" height="18"') + '</div><div>' +
+      '<h2>' + headline + '</h2>' +
+      '<p>We checked all ' + num(ratingsTotal) + ' ratings (' + data.items.length + ' items × ' + R.length + ' raters × ' + DIMS.length + ' rubric dimensions). ' +
+      (DR ? DR + ' drifted lenient after item ' + dSt.breakPoint + '. ' : '') +
+      (RU ? RU + ' rushed: ' + rSt.medianSeconds + ' s per item and ' + pct(rSt.goldAcc) + ' gold accuracy. ' : '') +
+      (ambDims.length ? 'The ' + ambDims.map(function (d) { return L[d].toLowerCase(); }).join(', ') + ' guideline is ambiguous, so even accurate raters split into two camps. ' : '') +
+      'With the fixes below, overall reliability goes from α ' + f2(M.alpha.overall) + ' to ' + f2(M.after.overall) + (M.dimFlags.tone ? ' (tone projected)' : '') + '.</p>' +
+      '<div class="kpis">' +
+      '<div class="kpi"><div class="v">' + f2(M.alpha.overall) + '</div><div class="l">Overall α now · ' + ALPHA_STATUS[E.verdict(M.alpha.overall)].label.toLowerCase() + '</div></div>' +
+      '<div class="kpi"><div class="v">' + f2(M.after.overall) + '</div><div class="l">Overall α after fixes</div></div>' +
+      '<div class="kpi"><div class="v">' + num(M.impact.affected) + '</div><div class="l">Ratings to re-queue or re-rate</div></div>' +
+      '<div class="kpi"><div class="v">' + num(ratingsTotal - M.impact.affected) + '</div><div class="l">Ratings kept as delivered</div></div>' +
+      '</div></div></div>';
+
+    var lowDims = DIMS.filter(function (d) { return M.alpha[d] < E.THRESH.tentative; });
+    h += '<div class="grid g2" style="margin-top:18px">' +
+      '<div class="card"><p class="chart-title">Reliability by rubric dimension</p><p class="takeaway">' +
+      (lowDims.length ? lowDims.map(function (d) { return L[d]; }).join(', ') + ' is the only dimension below the 0.667 floor (α ' + lowDims.map(function (d) { return f2(M.alpha[d]); }).join(', ') + '); the other three are tentative, not broken.' : 'All dimensions clear the 0.667 floor.') +
+      '</p>' + alphaBarsChart() + bandLegend() + '</div>' +
+      '<div class="card"><p class="chart-title">Before vs after the recommended fixes</p><p class="takeaway">Every dimension moves into the reliable band once the two raters are handled and tone is re-rated with a clear guideline.</p>' +
+      beforeAfterChart() + bandLegend('<span class="lg"><svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="#7d7f85"/></svg>Now</span><span class="lg"><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="#2a5bd7"/></svg>After (recomputed)</span><span class="lg"><svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="#fff" stroke="#2a5bd7" stroke-width="1.8" stroke-dasharray="2.5 1.5"/></svg>After (projected)</span>') +
+      '<p class="note">After = α recomputed on the same data with ' + (RU ? RU + ' excluded' : '') + (DR ? ' and ' + DR + '’s ratings from item ' + dSt.breakPoint + ' held out for re-queue' : '') + '. Tone is <b>projected</b>: it’s regenerated with both camps applying the revised guideline (same rater noise), because the re-rating hasn’t happened yet. With the rater fixes alone, tone only reaches α ' + f2(M.after.toneObservedOnly) + '.</p></div>' +
+      '</div>';
+
+    h += '<div class="section-title"><h3>Issues found</h3><span class="note" style="margin:0">Each flag comes from a documented rule, applied to every rater and dimension.</span></div><div class="grid g3">';
+    if (DR) h += '<div class="card issue"><div class="head"><span class="who">Rater ' + DR + '</span>' + raterBadge('Drift') + '</div>' +
+      '<h3>' + DR + ' drifted lenient mid-batch</h3>' +
+      '<p class="evidence">From item ~' + dSt.breakPoint + ', ' + DR + ' scores average <b>' + sgn(dSt.devAfter) + '</b> above the other raters (vs ' + sgn(dSt.devBefore) + ' before). Their agreement falls from ' + pct(dSt.agreeBefore) + ' to ' + pct(dSt.agreeAfter) + '.</p>' +
+      '<div class="rule"><b>Flagged because</b> rolling agreement (' + E.RULES.windowSize + '-item window) stayed more than ' + E.RULES.driftDrop.toFixed(2) + ' below ' + DR + '’s own first-half baseline for <b>' + dSt.driftRun + '</b> consecutive items. Rule: ≥ ' + E.RULES.driftRun + '.</div>' +
+      '<button class="link-btn" data-goto="raters" data-rater="' + DR + '" data-focus="#drift-card">View details →</button></div>';
+    if (RU) h += '<div class="card issue bad"><div class="head"><span class="who">Rater ' + RU + '</span>' + raterBadge('Rushing') + '</div>' +
+      '<h3>' + RU + ' is rushing and inaccurate</h3>' +
+      '<p class="evidence">Median <b>' + rSt.medianSeconds + ' s</b> per item vs ' + M.groupMedianSeconds + ' s for the group (' + pct(rSt.medianSeconds / M.groupMedianSeconds) + '). Gold accuracy is <b>' + pct(rSt.goldAcc) + '</b>, vs ' + goldPhrase(okGoldMin) + ' for the healthy raters.</p>' +
+      '<div class="rule"><b>Flagged because</b> median time is &lt; ' + pct(E.RULES.rushTimeRatio) + ' of the group median <b>and</b> gold accuracy is &lt; ' + pct(E.RULES.rushGoldAcc) + '. Both must hold.</div>' +
+      '<button class="link-btn" data-goto="raters" data-rater="' + RU + '" data-focus="#speed-card">View details →</button></div>';
+    ambDims.forEach(function (d) {
+      h += '<div class="card issue bad"><div class="head"><span class="who">Rubric · ' + L[d] + '</span><span class="status bad">' + ICON.book + 'Ambiguous</span></div>' +
+        '<h3>The tone guideline is ambiguous</h3>' +
+        '<p class="evidence">α <b>' + f2(M.alpha[d]) + '</b> while the other dimensions are ' + f2(healthyAlphaMin) + '–' + f2(healthyAlphaMax) + '. Raters split into two stable camps (κ ' + f2(M.toneCamps.within) + ' within a camp vs ' + f2(M.toneCamps.across) + ' across), mostly on advice and creative writing.</p>' +
+        '<div class="rule"><b>Flagged because</b> this dimension’s α is &lt; ' + E.RULES.ambiguousAlpha + ' while every other dimension is ≥ ' + E.RULES.ambiguousOthers + '. The same raters agree elsewhere, so the problem is the rubric, not the raters.</div>' +
+        '<button class="link-btn" data-goto="rubric" data-dim="' + d + '" data-focus="#rubric-top">View details →</button></div>';
+    });
+    h += '</div>';
+    $('#view-overview').innerHTML = h;
+  }
+
+  /* ================= VIEW 2: RATERS ================= */
+  var selectedRater = DR || R[0];
+  function renderRaters() {
+    var h = '<h2>Raters</h2><p class="lede">How each of the six raters compares with the others and with the gold set. Click a row to see that rater’s per-dimension breakdown.</p>';
+    h += '<div class="card"><div class="table-scroll"><table id="rater-table"><thead><tr><th>Rater</th><th class="num">Ratings</th><th class="num">Median time</th><th class="num">Gold accuracy</th><th class="num">Gold MAE</th><th class="num">Corr. with consensus</th><th>Status</th></tr></thead><tbody>' +
+      R.map(function (rid) {
+        var st = M.raters[rid];
+        return '<tr class="clickable" data-rater-row="' + rid + '" tabindex="0"><td><b>' + rid + '</b></td><td class="num">' + num(st.count) + '</td>' +
+          '<td class="num' + (st.rushFlag ? ' flagged-val' : '') + '">' + st.medianSeconds + ' s</td>' +
+          '<td class="num' + (st.goldAcc < E.RULES.rushGoldAcc ? ' flagged-val' : '') + '">' + pct(st.goldAcc) + '</td>' +
+          '<td class="num">' + f2(st.goldMAE) + '</td><td class="num">' + f2(st.corr) + '</td><td>' + raterBadge(st.status) + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="note">Gold accuracy is the share of ' + M.goldCount * 4 + ' gold ratings (' + M.goldCount + ' items × 4 dimensions) within ±1 of the gold score. Correlation is Pearson r with the leave-one-out mean of the other five raters, averaged over the 4 dimensions.</p></div>';
+
+    h += '<div class="card" id="drift-card" style="margin-top:18px"><p class="chart-title">Agreement with the other raters over the batch</p>' +
+      '<p class="takeaway">' + (DR ? DR + '’s agreement drops sharply after item ' + dSt.breakPoint + ', from ' + pct(dSt.agreeBefore) + ' to ' + pct(dSt.agreeAfter) + '. Every other rater holds steady at their own level.' : 'No rater’s agreement drifts over the batch.') + '</p>' +
+      '<div id="drift-chart">' + driftChart() + '</div>' +
+      (DR ? '<div class="legend"><span class="lg"><i class="ln" style="border-color:var(--accent)"></i>' + DR + ' (drift)</span><span class="lg"><i class="ln" style="border-color:var(--series-r6)"></i>' + RU + ' (rushing)</span><span class="lg"><i class="ln" style="border-color:var(--series-other)"></i>Other raters</span>' +
+        '<span class="lg"><i class="ln" style="border-top:1.5px dotted var(--accent)"></i>' + DR + ' first-half baseline (' + pct(dSt.baseline) + ')</span><span class="lg"><i class="ln" style="border-top:1.5px dashed var(--warn)"></i>' + DR + ' flag threshold: baseline − ' + E.RULES.driftDrop.toFixed(2) + ' (' + pct(dSt.baseline - E.RULES.driftDrop) + ')</span>' +
+        '<span class="lg"><i style="background:var(--warn-soft);border-color:#ecd9b0"></i>Windows where the drift rule fires</span></div>' : '') +
+      '<p class="note">Agreement = share of a rater’s ratings within ±' + E.RULES.agreeTolerance + ' of the mean of the other five raters on the same item and dimension. The break point is a least-squares change-point estimate on ' + (DR || 'the rater') + '’s signed deviation from consensus. ' + (RU ? RU + ' sits low throughout: that’s a level problem (rushing), not drift.' : '') + ' Hover to read values.</p></div>';
+
+    h += '<div class="grid g2" style="margin-top:18px">' +
+      '<div class="card" id="speed-card"><p class="chart-title">Speed vs gold accuracy</p><p class="takeaway">' + (RU ? RU + ' is the only rater in the rushing zone: ' + Math.round(M.groupMedianSeconds / rSt.medianSeconds) + '× faster than the group, with the lowest gold accuracy.' : 'No rater is both fast and inaccurate.') + '</p>' + speedChart() + '</div>' +
+      '<div class="card" id="rater-detail"></div></div>';
+    $('#view-raters').innerHTML = h;
+    $all('[data-rater-row]').forEach(function (tr) {
+      tr.addEventListener('click', function () { selectRater(tr.dataset.raterRow); });
+      tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectRater(tr.dataset.raterRow); } });
+    });
+    attachDrift();
+    selectRater(selectedRater);
+  }
+  function selectRater(rid) {
+    selectedRater = rid;
+    $all('[data-rater-row]').forEach(function (tr) { tr.classList.toggle('selected', tr.dataset.raterRow === rid); });
+    var st = M.raters[rid], el = $('#rater-detail'); if (!el) return;
+    var groupMean = function (d) { return E.mean(others([rid]).map(function (o) { return M.raters[o].meanByDim[d]; })); };
+    var timeRatio = st.medianSeconds / M.groupMedianSeconds;
+    var h = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h3>' + rid + ' · per-dimension breakdown</h3>' + raterBadge(st.status) + '</div>';
+    h += '<p class="note" style="margin-top:2px">Tone reading: ' + E.CAMP_LABEL[st.camp] + '.</p>';
+    h += '<div class="table-scroll"><table><thead><tr><th>Dimension</th><th class="num">Corr. w/ consensus</th><th class="num">Gold ±1</th><th class="num">Mean score</th><th class="num">Others’ mean</th><th class="num">Avg κ</th></tr></thead><tbody>' +
+      DIMS.map(function (dim, d) {
+        var diff = st.meanByDim[d] - groupMean(d);
+        return '<tr><td>' + L[dim] + '</td><td class="num">' + f2(st.corrByDim[d]) + '</td><td class="num">' + pct(st.goldAccByDim[d]) + '</td>' +
+          '<td class="num">' + f2(st.meanByDim[d]) + ' <span class="wc">(' + sgn(diff) + ')</span></td><td class="num">' + f2(groupMean(d)) + '</td><td class="num">' + f2(st.kappaAvgByDim[d]) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    h += '<h4 style="margin-top:16px">Flag rules for ' + rid + '</h4><div class="stack" style="font-size:13.5px">' +
+      '<div class="rule"><b>Drift:</b> longest run below baseline − ' + E.RULES.driftDrop.toFixed(2) + ' = <b>' + st.driftRun + '</b> items (needs ≥ ' + E.RULES.driftRun + '). Baseline ' + pct(st.baseline) + ', lowest window ' + pct(st.minRolling) + '. → ' + (st.driftFlag ? '<b>flagged</b>' : 'not flagged') + '</div>' +
+      '<div class="rule"><b>Rushing:</b> median ' + st.medianSeconds + ' s = <b>' + pct(timeRatio) + '</b> of group median (needs &lt; ' + pct(E.RULES.rushTimeRatio) + ') · gold accuracy <b>' + pct(st.goldAcc) + '</b> (needs &lt; ' + pct(E.RULES.rushGoldAcc) + '). → ' + (st.rushFlag ? '<b>flagged</b>' : 'not flagged') + '</div>' +
+      '<div class="rule"><b>Mean score</b> on items 1–' + (E.DRIFT_START - 1) + ': ' + f2(st.meanBefore) + ' · items ' + E.DRIFT_START + '–240: ' + f2(st.meanAfter) + ' (' + sgn(st.meanAfter - st.meanBefore) + ')</div></div>';
+    // hand-written items where this rater deviates most
+    var dev = data.items.filter(function (it) { return it.written; }).map(function (it) {
+      var i = it.sequence_index - 1, best = null;
+      DIMS.forEach(function (dim, d) {
+        var o = E.mean(others([rid]).map(function (x) { return data.ratings[x][i][d]; }));
+        var diff = data.ratings[rid][i][d] - o;
+        if (!best || Math.abs(diff) > Math.abs(best.diff)) best = { d: d, diff: diff, s: data.ratings[rid][i][d], o: o };
+      });
+      return { it: it, best: best };
+    }).sort(function (a, b) { return Math.abs(b.best.diff) - Math.abs(a.best.diff); }).slice(0, 3);
+    h += '<h4 style="margin-top:16px">Where ' + rid + ' differs most (reviewed items)</h4><ul style="margin:0;padding-left:18px;font-size:13.5px">' + dev.map(function (x) {
+      return '<li>#' + x.it.sequence_index + ' (' + x.it.category + ') “' + esc(x.it.prompt.slice(0, 70)) + (x.it.prompt.length > 70 ? '…' : '') + '”: ' + L[DIMS[x.best.d]].toLowerCase() + ' <b>' + x.best.s + '</b> vs others’ mean ' + x.best.o.toFixed(1) + '</li>';
+    }).join('') + '</ul>';
+    el.innerHTML = h;
+  }
+
+  /* ================= VIEW 3: RUBRIC ================= */
+  var selectedDim = ambDims[0] || 'tone';
+  function campScoresFor(seq) {
+    var i = seq - 1, r = {};
+    R.forEach(function (rid) { r[rid] = data.ratings[rid][i][3]; });
+    return { pro: [r.R1, r.R3], user: [r.R2, r.R5] };
+  }
+  function rangeStr(a) { var lo = Math.min.apply(null, a), hi = Math.max.apply(null, a); return lo === hi ? String(lo) : lo + '–' + hi; }
+  function renderRubric() {
+    var h = '<div id="rubric-top"></div><h2>Rubric</h2><p class="lede">Reliability per rubric dimension. If accurate raters agree on three dimensions but split on one, the fault is in the guideline. Select a dimension to see its rater-by-rater agreement.</p>';
+    h += '<div class="dimtiles" id="dimtiles">' + DIMS.map(function (d) {
+      return '<button class="dimtile" data-dim-tile="' + d + '" aria-pressed="false"><div class="name">' + L[d] + '</div><div class="val">' + f2(M.alpha[d]) + '</div>' + alphaBadge(M.alpha[d]) + '</button>';
+    }).join('') + '</div>';
+    h += '<div class="grid g-5-7" style="margin-top:18px"><div class="card"><p class="chart-title" id="heat-title"></p><p class="takeaway" id="heat-take"></p><div id="heat"></div></div>' +
+      '<div class="card"><h4>Why this is a rubric problem, not a rater problem</h4><ul style="font-size:14px;margin:4px 0;padding-left:18px">' +
+      '<li>The four camp raters (R1, R2, R3, R5) score ' + goldPhrase(Math.min(M.raters.R1.goldAcc, M.raters.R2.goldAcc, M.raters.R3.goldAcc, M.raters.R5.goldAcc)) + ' on gold and agree on correctness, instruction following and helpfulness.</li>' +
+      '<li>On tone they split into consistent pairs: κ ' + f2(M.toneCamps.within) + ' within a camp vs ' + f2(M.toneCamps.across) + ' across camps.</li>' +
+      '<li>The guideline never says whose context counts. R1 and R3 judge against a professional setting; R2 and R5 judge against the user’s situation.</li>' +
+      '<li>R4 has no consistent reading and sits between the camps (κ ' + f2(Math.min.apply(null, [0, 1, 2, 4].map(function (j) { return M.kappa.tone[3][j]; }))) + '–' + f2(Math.max.apply(null, [0, 1, 2, 4].map(function (j) { return M.kappa.tone[3][j]; }))) + ' with the camp raters). ' + (RU || 'The rushing rater') + ' agrees weakly with everyone, as on every other dimension.</li></ul>' +
+      '<p class="note">Re-training individual raters wouldn’t fix this: both camps are internally consistent and accurate on gold. Only a clearer guideline will.</p></div></div>' +
+      '<div class="card" style="margin-top:18px"><p class="chart-title">Disagreement by category</p><p class="takeaway">Tone disagreement is concentrated in advice and creative writing (mean spread ' + f2(ambSplit.ambiguous) + ' vs ' + f2(ambSplit.other) + ' elsewhere). The other dimensions look flat across categories.</p>' +
+      catMultiples() + '<p class="note">Spread = standard deviation of the 6 ratings on an item, averaged over the category’s items. Red bars mark the categories driving the tone flag. All panels share one x-axis, so you can compare across them.</p></div>';
+
+    // examples
+    var withText = M.toneItems.filter(function (t) { return t.item.written && Math.abs(t.gap) >= 1; });
+    var bigGapNoText = M.toneItems.filter(function (t) { return !t.item.written && Math.abs(t.gap) >= 2.5; }).length;
+    var top = withText;
+    h += '<div class="card" style="margin-top:18px" id="examples"><p class="chart-title">Highest-disagreement tone items</p><p class="takeaway">The biggest splits come when the user sets a casual or emotional context and the two camps judge the same response in opposite ways.</p>' +
+      '<p class="note" style="margin:-6px 0 8px">Showing the ' + top.length + ' items with full text, ranked by camp gap. Another ' + bigGapNoText + ' items without text in this synthetic set have a gap of 2.5 or more.</p>' +
+      '<p class="note" style="margin:-4px 0 12px"><span class="campkey pro"></span>Professional-setting camp (R1, R3) &nbsp; <span class="campkey user"></span>User’s-context camp (R2, R5) &nbsp; Camp gap = user camp mean − professional camp mean.</p>' +
+      top.map(function (t, k) {
+        var it = t.item;
+        return '<details class="ex"' + (k === 0 ? ' open' : '') + '><summary><span class="id">#' + it.sequence_index + ' · ' + it.category + '</span><span class="p">' + esc(it.prompt) + '</span><span style="display:flex;gap:10px;align-items:center"><span class="status ' + (Math.abs(t.gap) >= 2 ? 'bad' : 'warn') + '">gap ' + sgn(t.gap, 1) + '</span><span class="caret">' + ICON.caret + '</span></span></summary>' +
+          '<div class="body"><div class="qa"><div><div class="lbl">Prompt</div><div class="txt">' + esc(it.prompt) + '</div></div><div><div class="lbl">Model response</div><div class="txt">' + esc(it.response) + '</div></div></div>' +
+          '<div class="scores">' + R.map(function (rid) {
+            var c = E.CAMP[rid];
+            return '<div class="score ' + (c === 'pro' || c === 'user' ? c : '') + '"><div class="r">' + rid + '</div><div class="s">' + t.scores[rid] + '<span class="wc"> / 5</span></div><div class="c">' + (c === 'pro' ? 'Professional camp' : c === 'user' ? 'User’s-context camp' : rid === RU ? 'Flagged: rushing' : 'No camp') + '</div></div>';
+          }).join('') + '</div>' +
+          '<p class="note">Professional camp mean ' + t.proMean.toFixed(1) + ' · User’s-context camp mean ' + t.userMean.toFixed(1) + '. Other dimensions on this item: ' +
+          DIMS.slice(0, 3).map(function (dim, d) { return L[dim].toLowerCase() + ' ' + E.mean(R.map(function (rid) { return data.ratings[rid][it.sequence_index - 1][d]; })).toFixed(1); }).join(', ') + ' (mean of 6).</p></div></details>';
+      }).join('') + '</div>';
+
+    // guideline
+    var exA = data.items[46], exB = data.items[181];
+    var cA = campScoresFor(47), cB = campScoresFor(182);
+    h += '<div class="card" style="margin-top:18px" id="guideline"><p class="chart-title">Guideline revision: tone</p><p class="takeaway">The fix is one explicit rule, the user’s situation counts, plus score anchors and two worked examples from this batch.</p>' +
+      '<div class="guides"><div class="guide orig"><div class="tag">Original guideline</div><blockquote>“Rate whether the tone of the response is appropriate.”</blockquote>' +
+      '<p class="note">What it leaves open: appropriate <i>for whom</i>? Raters filled the gap differently, so the split is consistent rather than random.</p>' +
+      '<h4 style="margin-top:14px">Rationale for the revision</h4><ul style="font-size:13.5px;padding-left:18px;margin:4px 0">' +
+      '<li>Pick one reference point and name it. The user’s stated or implied situation matches what the customer’s assistant is for.</li>' +
+      '<li>Anchors at 1, 3 and 5 give raters shared calibration points.</li>' +
+      '<li>Worked examples come from the exact items where the camps split, so the rule is tested on the hard cases.</li>' +
+      '<li>Keep tone separate from correctness and helpfulness so it doesn’t double-count content quality.</li></ul></div>' +
+      '<div class="guide rev"><div class="tag">Suggested revision (pre-generated with Claude)</div>' +
+      '<blockquote><b>Tone: Is the tone right for this user’s situation?</b><br>Judge tone against the user’s stated or implied situation: who they are, what register they asked for, and how they seem to be feeling, as shown in the prompt. Do not apply a generic professional or workplace standard unless the prompt sets one (for example, “draft an email to my manager”). Rate content quality under the other dimensions, not here.</blockquote>' +
+      '<dl><dt>5</dt><dd>Tone fits the user’s situation and requested register: playful when they asked for humor, calm and warm when they’re stressed, formal when the task is formal.</dd>' +
+      '<dt>3</dt><dd>Acceptable but partly mismatched. Somewhat stiffer or more casual than the situation calls for, without undercutting the help.</dd>' +
+      '<dt>1</dt><dd>Tone works against the user: cold or bureaucratic toward someone in distress, flippant about a serious problem, or stiff when they explicitly asked for humor.</dd></dl>' +
+      '<div class="worked"><b>Worked examples from batch 3</b>' +
+      '<p><b>Item #47 (advice, layoff).</b> The user says they “can’t think straight.” The response reads like an HR notice (“Failure to complete these steps promptly may result in a loss of benefits”). The content is useful, but the tone ignores the user’s state. <b>Tone: 2.</b> <span class="wc">Under the old guideline: professional camp ' + rangeStr(cA.pro) + ', user’s-context camp ' + rangeStr(cA.user) + '.</span></p>' +
+      '<p><b>Item #182 (creative writing, joke resignation letter).</b> The user explicitly asked for an over-the-top letter for a friends’ group chat. Theatrical humor is exactly the requested register. <b>Tone: 5.</b> <span class="wc">Under the old guideline: professional camp ' + rangeStr(cB.pro) + ', user’s-context camp ' + rangeStr(cB.user) + '.</span></p></div>' +
+      '</div></div></div>';
+    $('#view-rubric').innerHTML = h;
+    $all('[data-dim-tile]').forEach(function (b) { b.addEventListener('click', function () { selectDim(b.dataset.dimTile); }); });
+    selectDim(selectedDim);
+    void exA; void exB;
+  }
+  function selectDim(d) {
+    selectedDim = d;
+    $all('[data-dim-tile]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.dimTile === d ? 'true' : 'false'); });
+    var t = $('#heat-title'); if (!t) return;
+    t.textContent = 'Pairwise agreement: ' + L[d] + ' (quadratic weighted κ)';
+    var K = M.kappa[d], ix = function (id) { return R.indexOf(id); };
+    var healthy = others([RU].filter(Boolean));
+    var vals = []; healthy.forEach(function (a, i) { healthy.forEach(function (b, j) { if (j > i) vals.push(K[ix(a)][ix(b)]); }); });
+    var take;
+    if (M.dimFlags[d]) take = 'Two blocks: R1 and R3 agree with each other (κ ' + f2(K[ix('R1')][ix('R3')]) + '), and so do R2 and R5 (κ ' + f2(K[ix('R2')][ix('R5')]) + '), but agreement across the camps falls to ' + f2(M.toneCamps.across) + '.';
+    else take = 'No camp structure: the raters other than ' + (RU || '—') + ' agree with each other at κ ' + f2(Math.min.apply(null, vals)) + '–' + f2(Math.max.apply(null, vals)) + '.' + (RU ? ' ' + RU + '’s row is pale throughout.' : '');
+    $('#heat-take').textContent = take;
+    $('#heat').innerHTML = heatmap(d);
+  }
+
+  /* ================= VIEW 4: CUSTOMER SUMMARY ================= */
+  function memoModel() {
+    var bR = M.impact.byReason;
+    return {
+      subject: 'Batch 3 quality review: findings and re-rating plan',
+      checked: 'We reviewed all ' + num(ratingsTotal) + ' ratings in batch 3 (' + data.items.length + ' items × ' + R.length + ' raters × ' + DIMS.length + ' rubric dimensions). We checked agreement between raters (Krippendorff’s α), accuracy on ' + M.goldCount + ' gold items, agreement over the course of the batch, and time spent per item.',
+      findings: [
+        RU ? 'One rater was rushing. ' + RU + ' spent a median of ' + rSt.medianSeconds + ' s per item against ' + M.groupMedianSeconds + ' s for the group, and only ' + pct(rSt.goldAcc) + ' of their gold ratings were within one point of the gold score. The healthy raters scored ' + goldPhrase(okGoldMin) + '.' : null,
+        DR ? 'One rater drifted. From item ' + dSt.breakPoint + ' on, ' + DR + ' scored on average ' + sgn(dSt.devAfter) + ' points above the other raters (' + sgn(dSt.devBefore) + ' before that point). Their agreement with the group fell from ' + pct(dSt.agreeBefore) + ' to ' + pct(dSt.agreeAfter) + '.' : null,
+        ambDims.length ? 'The tone guideline is ambiguous. Tone reliability is α ' + f2(M.alpha.tone) + ', below the 0.667 floor, while the other three dimensions are ' + f2(healthyAlphaMin) + '–' + f2(healthyAlphaMax) + '. Accurate raters split into two consistent readings of “appropriate”: the user’s situation vs a professional setting. The split is concentrated in advice and creative writing items.' : null
+      ].filter(Boolean),
+      actions: [
+        RU ? 'Replace all ' + num(bR.rushing) + ' of ' + RU + '’s ratings with ratings from a calibrated rater. ' + RU + ' is paused until they pass a gold calibration round.' : null,
+        DR ? 'Re-queue ' + DR + '’s ' + num(bR.drift) + ' ratings from item ' + dSt.breakPoint + ' on. ' + DR + ' recalibrates on gold before taking new work. Their ratings before item ' + dSt.breakPoint + ' agree with the group and are kept.' : null,
+        ambDims.length ? 'Issue a revised tone guideline with an explicit context rule, score anchors and worked examples. Then re-rate tone on the ' + M.impact.ambiguousItems + ' advice and creative writing items (' + num(bR.tone) + ' ratings).' : null,
+        'Run the same checks continuously on batch 4, with alerts on drift and rushing during the batch.'
+      ].filter(Boolean),
+      impact: { affected: M.impact.affected, total: ratingsTotal, kept: ratingsTotal - M.impact.affected, share: M.impact.share, byReason: bR },
+      afterRows: DIMS.map(function (d) { return { label: L[d], now: M.alpha[d], after: M.after[d], projected: d === 'tone' && M.dimFlags.tone }; }),
+      interim: 'Until the re-rated batch arrives, we suggest not training on batch 3 tone labels. For the other three dimensions, the ratings we’re keeping are already in the reliable range: α ' + DIMS.filter(function (d) { return d !== 'tone'; }).map(function (d) { return f2(M.after[d]); }).join(', ') + '.',
+      timeline: 'You’ll receive the re-rated batch within 3 business days of your confirmation, along with the updated reliability numbers.',
+      question: 'When raters judge tone, should “appropriate” mean appropriate for the user’s stated or implied situation (our recommendation), or for a professional setting regardless of what the user asked for? Your answer sets the guideline for this batch and the ones after it.'
+    };
+  }
+  function renderSummary() {
+    var m = memoModel();
+    var h = '<h2 class="no-print">Customer summary</h2><p class="lede no-print">A send-ready findings memo for Northwind AI’s ML lead. Every number is computed live from the metrics in this console.</p>' +
+      '<div class="memo-actions"><button class="btn primary" id="copy-memo">' + ICON.copy + 'Copy as text</button><button class="btn" id="print-memo">' + ICON.print + 'Print / Save as PDF</button><span class="toast" id="copy-toast" aria-live="polite"></span></div>';
+    h += '<article class="memo" id="memo">' +
+      '<div class="mhead"><span class="k">To</span><span>ML lead, Northwind AI</span><span class="k">From</span><span>Delivery team</span><span class="k">Project</span><span>Assistant response quality, batch 3</span><span class="k">Re</span><span>' + m.subject + '</span></div>' +
+      '<h2>Batch 3: what we found and how we’re fixing it</h2>' +
+      '<h3>What we checked</h3><p>' + m.checked + '</p>' +
+      '<h3>What we found</h3><ol>' + m.findings.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ol>' +
+      '<h3>What we’re doing about it</h3><ul>' + m.actions.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>' +
+      '<h3>Impact on your data</h3><p><b>' + num(m.impact.affected) + ' of ' + num(m.impact.total) + ' ratings (' + pct(m.impact.share) + ')</b> will be replaced: ' + num(m.impact.byReason.rushing) + ' from ' + (RU || '—') + ', ' + num(m.impact.byReason.drift) + ' from ' + (DR || '—') + ' after item ' + (dSt ? dSt.breakPoint : '—') + ', and ' + num(m.impact.byReason.tone) + ' tone ratings. The other ' + num(m.impact.kept) + ' ratings stay as delivered. Expected reliability after the fixes:</p>' +
+      '<table><thead><tr><th>Dimension</th><th class="num">α now</th><th class="num">α after fixes</th></tr></thead><tbody>' + m.afterRows.map(function (r) {
+        return '<tr><td>' + r.label + '</td><td class="num">' + f2(r.now) + '</td><td class="num"><b>' + f2(r.after) + '</b>' + (r.projected ? ' <span class="wc">(projected)</span>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p style="margin-top:8px">' + m.interim + '</p>' +
+      '<h3>Timeline</h3><p>' + m.timeline + '</p>' +
+      '<h3>One question for you</h3><div class="ask">' + m.question + '</div>' +
+      '<div class="foot">Thresholds: α ≥ 0.80 reliable, 0.667–0.80 tentative, &lt; 0.667 unreliable (Krippendorff). Tone after-fix value is projected until re-rating is complete. Synthetic demo data.</div>' +
+      '</article>';
+    $('#view-summary').innerHTML = h;
+    $('#print-memo').addEventListener('click', function () { window.print(); });
+    $('#copy-memo').addEventListener('click', function () {
+      var txt = memoText(m);
+      var done = function () { $('#copy-toast').textContent = '✓ Copied to clipboard'; setTimeout(function () { $('#copy-toast').textContent = ''; }, 2500); };
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(done, function () { fallbackCopy(txt); done(); });
+      else { fallbackCopy(txt); done(); }
+    });
+  }
+  function fallbackCopy(txt) {
+    var ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) { /* ignore */ } document.body.removeChild(ta);
+  }
+  function memoText(m) {
+    var L2 = [];
+    L2.push('To: ML lead, Northwind AI', 'From: Delivery team', 'Project: Assistant response quality, batch 3', 'Re: ' + m.subject, '');
+    L2.push('WHAT WE CHECKED', m.checked, '');
+    L2.push('WHAT WE FOUND'); m.findings.forEach(function (x, i) { L2.push((i + 1) + '. ' + x); }); L2.push('');
+    L2.push('WHAT WE’RE DOING ABOUT IT'); m.actions.forEach(function (x) { L2.push('- ' + x); }); L2.push('');
+    L2.push('IMPACT ON YOUR DATA');
+    L2.push(num(m.impact.affected) + ' of ' + num(m.impact.total) + ' ratings (' + pct(m.impact.share) + ') will be replaced: ' + num(m.impact.byReason.rushing) + ' from ' + RU + ', ' + num(m.impact.byReason.drift) + ' from ' + DR + ' after item ' + dSt.breakPoint + ', and ' + num(m.impact.byReason.tone) + ' tone ratings. The other ' + num(m.impact.kept) + ' ratings stay as delivered.');
+    L2.push('Expected reliability (Krippendorff’s alpha), now → after fixes:');
+    m.afterRows.forEach(function (r) { L2.push('  ' + r.label + ': ' + f2(r.now) + ' → ' + f2(r.after) + (r.projected ? ' (projected)' : '')); });
+    L2.push(m.interim, '');
+    L2.push('TIMELINE', m.timeline, '');
+    L2.push('ONE QUESTION FOR YOU', m.question);
+    return L2.join('\n');
+  }
+
+  /* ================= VIEW 5: METHODOLOGY ================= */
+  function renderMethod() {
+    var h = '<div class="prose"><h2>Methodology</h2><p class="lede">How the data was made, what each number means, and where the numbers can mislead.</p>' +
+      '<h3>Dataset (synthetic, stated openly)</h3>' +
+      '<p>Every item, rater and rating is synthetic demo data, generated in the browser with a seeded PRNG (mulberry32, seed ' + E.SEED + '), so every load shows the same numbers. Northwind AI is a fictional customer. The batch has ' + data.items.length + ' prompt/response items across 5 categories, with ' + M.goldCount + ' gold items. Six raters each rate every item on 4 dimensions (1–5), in the same order (sequence index 1–240). ' + data.items.filter(function (i) { return i.written; }).length + ' items have hand-written text; the rest show a placeholder label.</p>' +
+      '<p>Each item has a latent true score per dimension. A normal rater’s score is the true score + a fixed rater bias (±0.3) + Gaussian noise (SD ' + E.NOISE_SD + '), rounded and clamped to 1–5. Normal raters take about 45–58 s per item (log-normal). Gold items are deliberately clear-cut (true scores near 1 or 5). Three problems are planted:</p>' +
+      '<ul><li><b>Drift (R4):</b> matches the group until item ' + (E.DRIFT_START - 1) + ', then +' + E.DRIFT_SHIFT + ' on every dimension.</li>' +
+      '<li><b>Rushing (R6):</b> median ~9 s per item; scores are 30% true score + 70% noise around 3.5, so mostly 3s and 4s.</li>' +
+      '<li><b>Ambiguous tone:</b> on advice and creative writing items, R1 and R3 judge against a professional setting while R2 and R5 judge against the user’s situation. R4 has no consistent reading.</li></ul>' +
+      '<p>The detection rules below don’t know about these settings. They only see the ratings.</p>' +
+      '<h3>Metrics</h3><table><thead><tr><th>Metric</th><th>Definition</th></tr></thead><tbody>' +
+      '<tr><td>Krippendorff’s α</td><td>Interval metric, δ = (a − b)². α = 1 − D<sub>o</sub>/D<sub>e</sub>, computed per dimension, and overall with each item × dimension as a unit. Handles missing ratings, which is how “after” excludes held-out ratings. Treating a 1–5 Likert scale as interval is a common, defensible choice; ordinal α would be a reasonable alternative. <code>selfTest()</code> checks the implementation against a 3-unit hand-computed example (α = 0.8276) and the published 4-coder example in Krippendorff (2011) (interval α = 0.849, nominal α = 0.743).</td></tr>' +
+      '<tr><td>Cohen’s κ (quadratic)</td><td>Pairwise between raters, fixed 1–5 categories, weights (i − j)².</td></tr>' +
+      '<tr><td>Rater vs consensus</td><td>Pearson r between a rater’s scores and the leave-one-out mean of the other five raters.</td></tr>' +
+      '<tr><td>Gold accuracy</td><td>Share of gold ratings within ±1 of the gold score, plus mean absolute error.</td></tr>' +
+      '<tr><td>Drift</td><td>Per item: share of the 4 dimensions within ±' + E.RULES.agreeTolerance + ' of the leave-one-out mean. Plotted as a trailing ' + E.RULES.windowSize + '-item rolling mean. The break point is the two-segment least-squares split of the rater’s signed deviation from consensus.</td></tr>' +
+      '<tr><td>Speed</td><td>Median seconds per item; the group median is the median of rater medians.</td></tr></tbody></table>' +
+      '<h3>Thresholds and flag rules</h3><ul>' +
+      '<li><b>Reliability bands:</b> α ≥ 0.80 reliable, 0.667–0.80 tentative, &lt; 0.667 unreliable. These are Krippendorff’s conventional cut-offs (Krippendorff, <i>Content Analysis</i>, 2004/2018: rely on α ≥ .800, draw only tentative conclusions for .667 ≤ α &lt; .800).</li>' +
+      '<li><b>Drift:</b> rolling agreement more than ' + E.RULES.driftDrop.toFixed(2) + ' below the rater’s own first-half baseline for ≥ ' + E.RULES.driftRun + ' consecutive items. Comparing a rater to their own baseline separates drift from a rater who is simply noisier.</li>' +
+      '<li><b>Rushing:</b> median time &lt; ' + pct(E.RULES.rushTimeRatio) + ' of the group median <b>and</b> gold accuracy &lt; ' + pct(E.RULES.rushGoldAcc) + '. Requiring both avoids flagging raters who are fast and accurate.</li>' +
+      '<li><b>Ambiguous dimension:</b> α &lt; ' + E.RULES.ambiguousAlpha + ' while every other dimension is ≥ ' + E.RULES.ambiguousOthers + '. The same raters are reliable elsewhere, so the guideline is the likely cause.</li></ul>' +
+      '<h3>Limitations</h3><ul>' +
+      '<li>The interval assumption treats 1→2 and 4→5 as equal steps. Raters may not.</li>' +
+      '<li>Leave-one-out consensus isn’t ground truth. If most raters share a bias, consensus inherits it, and only gold catches that.</li>' +
+      '<li>' + M.goldCount + ' gold items (' + M.goldCount * 4 + ' ratings per rater) gives a coarse accuracy estimate: one rating is ~' + (100 / (M.goldCount * 4)).toFixed(1) + ' points. A production gold set should be larger and refreshed so raters can’t memorize it.</li>' +
+      '<li>The drift detector uses a trailing window, so it fires ~' + (dSt && dSt.driftRunStart ? dSt.driftRunStart - dSt.breakPoint : 30) + ' items after a break. The change-point estimate locates the break after the fact.</li>' +
+      '<li>The projected tone α assumes raters apply the revised guideline consistently. It should be replaced with the real re-rated number.</li></ul>' +
+      '<h3>How I’d build this for real</h3>' +
+      '<p>I’d run these checks continuously while a project is live, not after delivery. Agreement over time becomes a number the delivery team watches daily, like an SLO. Drift and rushing raise alerts within a few dozen items, while the affected work is still small and cheap to redo.</p>' +
+      '<p>For guideline problems, I’d make live LLM calls to draft revisions, using the high-disagreement items as context. A human (the project lead, and the customer for anything that changes the meaning of a label) approves every change before raters see it. Each approved version is logged, so every rating can be traced to the guideline it was made under.</p>' +
+      '<p>Flagged ratings would be routed to re-queue or adjudication, never silently deleted. The customer should be able to see what changed and why, and the original ratings stay available for audit.</p>' +
+      '<p>To show a fix worked, I’d measure three things: α recovery on the next batch for the affected dimension, gold accuracy for recalibrated raters, and the customer’s own model metrics, such as reward-model accuracy on a held-out preference set or eval scores after training on the corrected data. The first two prove the data improved. Only the third proves it mattered.</p>' +
+      '<p>Before building it, I’d validate a few things with customers: which reliability thresholds they actually gate training on, whether they want flagged data held back or delivered with annotations, how much re-rating latency they’ll accept, and who on their side owns rubric decisions like the tone question.</p>' +
+      '</div>';
+    $('#view-method').innerHTML = h;
+  }
+
+  renderOverview(); renderRaters(); renderRubric(); renderSummary(); renderMethod();
+  show((location.hash || '#overview').slice(1));
+  window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
+})();
+
+</script>
+</body>
+</html>
